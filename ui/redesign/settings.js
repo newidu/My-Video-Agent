@@ -33,7 +33,6 @@
   let activeProvider = 'deepseek';
   let startupReady = false;
   let thinkingEnabled = false;
-  const nativeFetch = window.fetch.bind(window);
   window.AIVA_COMPOSER_THINKING = () => thinkingEnabled;
 
   function profileKey(id, suffix) { return PREFIX + id + '_' + suffix; }
