@@ -18,8 +18,9 @@ function wantsVideo(text) {
 /* run every tool call of one assistant turn, streaming its result into the chat */
 async function execToolCalls(acc, cur, messages) {
   const assistantTurn = { role: 'assistant', content: acc.content || null, tool_calls: acc.toolCalls };
-  // DeepSeek thinking + tools requires the complete reasoning_content on the follow-up request.
-  if (acc.reasoning) assistantTurn.reasoning_content = acc.reasoning;
+  // DeepSeek thinking + tools requires reasoning_content on the follow-up request.
+  const provider = window.AIVA_PROVIDER_SETTINGS ? window.AIVA_PROVIDER_SETTINGS.current() : 'deepseek';
+  if (provider === 'deepseek' && acc.reasoning) assistantTurn.reasoning_content = acc.reasoning;
   messages.push(assistantTurn);
   for (const tc of acc.toolCalls) {
     const name = tc.function && tc.function.name;
