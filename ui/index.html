@@ -7,6 +7,7 @@
 <title>My Video Agent</title>
 <link rel="stylesheet" href="./styles/base.css">
 <link rel="stylesheet" href="./redesign/claude.css">
+<link rel="stylesheet" href="./redesign/settings.css">
 </head>
 <body>
 <div class="app">
@@ -49,6 +50,282 @@
     </div>
   </header>
 
+
+  <section id="settingsView" class="settings-view" hidden aria-label="Application settings">
+    <div class="settings-header">
+      <div class="settings-header-title"><span class="settings-header-icon">⚙</span><div><strong>Settings</strong><small>Configure your creative workspace</small></div></div>
+      <div class="settings-header-actions"><span class="settings-profile-label">MY VIDEO AGENT</span><button id="btnCloseSettings" class="settings-close-button" title="Back to editor">← <span>Back to editor</span></button></div>
+    </div>
+    <div class="settings-layout">
+      <nav class="settings-nav" aria-label="Settings sections">
+        <div class="settings-nav-caption">PREFERENCES</div>
+        <button class="settings-nav-item active" data-settings-target="general"><span>◷</span> General</button>
+        <button class="settings-nav-item" data-settings-target="appearance"><span>◐</span> Appearance</button>
+        <button class="settings-nav-item" data-settings-target="editor"><span>▧</span> Video editor</button>
+        <div class="settings-nav-caption settings-nav-spaced">AI WORKSPACE</div>
+        <button class="settings-nav-item" data-settings-target="providers"><span>⌘</span> Providers &amp; models</button>
+        <button class="settings-nav-item" data-settings-target="skills"><span>◇</span> Skills</button>
+        <button class="settings-nav-item" data-settings-target="agent"><span>✳</span> Agent</button>
+        <button class="settings-nav-item" data-settings-target="tools"><span>⚒</span> Tools</button>
+        <div class="settings-nav-caption settings-nav-spaced">MEDIA</div>
+        <button class="settings-nav-item" data-settings-target="audio"><span>♫</span> Audio &amp; music</button>
+        <div class="settings-nav-caption settings-nav-spaced">SYSTEM</div>
+        <button class="settings-nav-item" data-settings-target="advanced"><span>⌘</span> Advanced</button>
+        <div class="settings-nav-footer"><span class="settings-online-dot"></span><span>Settings stored on this device</span></div>
+      </nav>
+      <main class="settings-content">
+        <section class="settings-panel active" data-settings-panel="general">
+          <div class="settings-page-heading"><span class="settings-kicker">PREFERENCES</span><h1>General</h1><p>Manage how My Video Agent opens and remembers your workspace.</p></div>
+          <section class="settings-card">
+            <div class="settings-card-heading"><div><span class="settings-kicker">STARTUP</span><h3>Startup experience</h3></div></div>
+            <div class="setting-row"><div><label for="settingStartupView">Open app to</label><p>Choose which workspace is shown when the app starts.</p></div><select id="settingStartupView"><option value="editor">Video editor</option><option value="settings">Settings</option></select></div>
+          </section>
+          <section class="settings-card">
+            <div class="settings-card-heading"><div><span class="settings-kicker">WORKSPACE</span><h3>Project defaults</h3></div></div>
+            <div class="setting-row"><div><label>Default video format</label><p>Choose your preferred aspect ratio in Video editor settings.</p></div><button class="settings-secondary-button" data-open-settings="editor">Configure editor</button></div>
+            <div class="setting-row"><div><label>Provider and model</label><p>Connect a model provider and manage saved model profiles.</p></div><button class="settings-secondary-button" data-open-settings="providers">Manage providers</button></div>
+            <div class="setting-row"><div><label>Skills and agent tools</label><p>Control which capabilities and workflow instructions are available to the agent.</p></div><button class="settings-secondary-button" data-open-settings="skills">Manage skills</button></div>
+          </section>
+        </section>
+        <section class="settings-panel" data-settings-panel="appearance"><div class="settings-page-heading"><span class="settings-kicker">PREFERENCES</span><h1>Appearance</h1><p>Choose the visual style for the editor and agent workspace.</p></div>
+        <section class="settings-card">
+          <div class="settings-card-heading"><div><span class="settings-kicker">VISUAL THEME</span><h3>Appearance</h3></div></div>
+          <div class="theme-options">
+            <label class="theme-choice"><input type="radio" name="settingTheme" value="warm-dark"><span class="theme-swatch theme-warm"><i></i><i></i><i></i></span><b>Warm charcoal</b><small>Current Claude-inspired palette</small></label>
+            <label class="theme-choice"><input type="radio" name="settingTheme" value="graphite"><span class="theme-swatch theme-graphite"><i></i><i></i><i></i></span><b>Graphite</b><small>Neutral dark workspace</small></label>
+            <label class="theme-choice"><input type="radio" name="settingTheme" value="light"><span class="theme-swatch theme-light"><i></i><i></i><i></i></span><b>Light</b><small>Bright editing workspace</small></label>
+          </div>
+        </section></section>
+        <section class="settings-panel" data-settings-panel="editor"><div class="settings-page-heading"><span class="settings-kicker">CREATIVE WORKSPACE</span><h1>Video editor</h1><p>Set your canvas defaults and editing preferences.</p></div>
+        <section class="settings-card">
+          <div class="settings-card-heading"><div><span class="settings-kicker">CANVAS</span><h3>Video editor defaults</h3></div><span class="settings-icon">▧</span></div>
+          <div class="settings-fields">
+            <div class="setting-field">
+              <label for="settingDefaultFormat">Default aspect ratio</label>
+              <select id="settingDefaultFormat" class="settings-wide-select">
+                <option value="9:16">9:16 · Vertical / Shorts / Reels</option>
+                <option value="16:9">16:9 · Landscape / YouTube</option>
+                <option value="1:1">1:1 · Square</option>
+              </select>
+              <small class="settings-help">Used as your preferred starting format. Apply it to the open project with the button below.</small>
+            </div>
+            <div class="settings-button-row"><button id="btnApplyDefaultFormat" class="settings-secondary-button">Apply to current project</button></div>
+            <div class="setting-row">
+              <div><label for="settingLetterMode">Letter-level selection mode</label><p>Keep the editor's individual-letter selection tool enabled by default.</p></div>
+              <input type="checkbox" id="settingLetterMode">
+            </div>
+            <div class="setting-row">
+              <div><label for="settingShowBeatGrid">Show beat grid when music is active</label><p>Display the music beat markers on the timeline.</p></div>
+              <input type="checkbox" id="settingShowBeatGrid">
+            </div>
+          </div>
+        </section>
+        <section class="settings-card">
+          <div class="settings-card-heading"><div><span class="settings-kicker">EDITING WORKFLOW</span><h3>Available editor tools</h3></div></div>
+          <div class="settings-feature-list">
+            <div><b>Canvas editing</b><span>Select, drag, edit and remove text, shapes and drawn elements.</span></div>
+            <div><b>Scenes and timeline</b><span>Scene selection, playback, scrubbing, undo/redo and project save/load.</span></div>
+            <div><b>Cut and erase</b><span>Area selection, crop, cut-out and destructive erase operations.</span></div>
+            <div><b>Typography</b><span>Upload custom TTF/OTF/WOFF fonts and edit text styles.</span></div>
+            <div><b>Export</b><span>Render the current composition to a video file or export a poster image.</span></div>
+          </div>
+        </section></section>
+        <section class="settings-panel" data-settings-panel="providers"><div class="settings-page-heading"><span class="settings-kicker">AI CONNECTIONS</span><h1>Providers &amp; models</h1><p>Manage model endpoints, credentials and active models.</p></div>
+        <div class="settings-callout">
+          <span class="callout-icon">⌘</span>
+          <div><strong>One agent · multiple model providers</strong><p>Connect an OpenAI-compatible API, choose a model, and switch profiles without replacing your video editor. Each provider keeps its own endpoint, model and saved key.</p></div>
+        </div>
+        <section class="settings-card">
+          <div class="settings-card-heading">
+            <div><span class="settings-kicker">CONNECTION</span><h3>Provider profile</h3></div>
+            <span class="connection-state"><i></i> Local profile</span>
+          </div>
+          <div class="settings-fields">
+            <div class="setting-field">
+              <label for="providerPreset">AI provider</label>
+              <select id="providerPreset" class="settings-wide-select">
+                <optgroup label="Hosted · OpenAI-compatible">
+                  <option value="deepseek">DeepSeek</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="openrouter">OpenRouter</option>
+                  <option value="groq">Groq</option>
+                  <option value="together">Together AI</option>
+                  <option value="fireworks">Fireworks AI</option>
+                  <option value="mistral">Mistral AI</option>
+                  <option value="xai">xAI</option>
+                  <option value="gemini">Google Gemini · OpenAI compatibility</option>
+                </optgroup>
+                <optgroup label="Local models">
+                  <option value="ollama">Ollama · localhost</option>
+                  <option value="lmstudio">LM Studio · localhost</option>
+                  <option value="vllm">vLLM · localhost</option>
+                </optgroup>
+                <optgroup label="Custom">
+                  <option value="custom">Custom OpenAI-compatible endpoint</option>
+                </optgroup>
+                <optgroup label="Native adapters · not yet available">
+                  <option value="anthropic" disabled>Anthropic native API · planned</option>
+                  <option value="bedrock" disabled>AWS Bedrock · planned</option>
+                  <option value="vertex" disabled>Google Vertex AI · planned</option>
+                  <option value="azure" disabled>Azure OpenAI native auth · planned</option>
+                </optgroup>
+              </select>
+              <small id="providerDescription" class="settings-help">Compatible chat-completions endpoint.</small>
+            </div>
+            <div class="setting-field">
+              <label for="baseUrl">API base URL</label>
+              <input id="baseUrl" class="settings-wide-input" value="https://api.deepseek.com" spellcheck="false" autocomplete="url">
+              <small class="settings-help">Use the provider's OpenAI-compatible API base URL. Do not include /chat/completions.</small>
+            </div>
+            <div class="setting-field">
+              <label for="model">Model ID</label>
+              <div class="settings-inline-input">
+                <select id="model" class="settings-wide-select" aria-label="Model ID">
+                  <option value="deepseek-v4-flash">deepseek-v4-flash</option>
+                  <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+                  <option value="deepseek-chat">deepseek-chat (legacy)</option>
+                  <option value="deepseek-reasoner">deepseek-reasoner (legacy)</option>
+                </select>
+                <button id="btnModels" class="settings-secondary-button">↻ Load models</button>
+              </div>
+              <small class="settings-help">Loads available model IDs from the selected endpoint's /models route.</small>
+            </div>
+            <div class="setting-field">
+              <label for="apiKey">API key / access token</label>
+              <input id="apiKey" class="settings-wide-input" type="password" placeholder="Paste provider API key" autocomplete="off" spellcheck="false">
+              <small id="providerKeyHint" class="settings-help">The key is used only for the active provider.</small>
+            </div>
+            <div class="setting-row setting-row-compact">
+              <div><label for="rememberKey">Remember API key on this device</label><p>Stored in browser localStorage. It is not encrypted like an operating-system credential vault.</p></div>
+              <input type="checkbox" id="rememberKey" checked>
+            </div>
+            <div class="settings-button-row">
+              <button id="btnSaveKey" class="settings-primary-button">Save provider profile</button>
+              <button id="btnForgetKey" class="settings-secondary-button">Forget this key</button>
+            </div>
+            <div id="settingsProviderStatus" class="settings-status" role="status" aria-live="polite">Select a provider and save its profile.</div>
+          </div>
+        </section>
+        <section class="settings-card">
+          <div class="settings-card-heading"><div><span class="settings-kicker">COMPATIBILITY</span><h3>Provider support</h3></div></div>
+          <div class="provider-capability-grid">
+            <div><span class="capability-ok">● Supported through compatible API</span><p>DeepSeek, OpenAI, OpenRouter, Groq, Together, Fireworks, Mistral, xAI, Gemini-compatible endpoint, Ollama, LM Studio, vLLM and custom endpoints.</p></div>
+            <div><span class="capability-pending">○ Native adapter planned</span><p>Anthropic Messages API, AWS Bedrock, Google Vertex AI and Azure-specific authentication need provider-native request/auth adapters. They are not presented as working until implemented.</p></div>
+          </div>
+        </section></section>
+        <section class="settings-panel" data-settings-panel="skills"><div class="settings-page-heading"><span class="settings-kicker">AGENT KNOWLEDGE</span><h1>Skills</h1><p>Manage the instruction library used by the video agent.</p></div>
+        <section class="settings-card">
+          <div class="settings-card-heading"><div><span class="settings-kicker">AGENT KNOWLEDGE</span><h3>Skills library</h3></div><span class="settings-icon">◇</span></div>
+          <p class="settings-copy">Choose which bundled instruction files the agent can use. Skills stay local to this app and can be enabled or disabled without deleting the originals.</p>
+          <input id="skillSearch" class="settings-wide-input" type="search" placeholder="Filter skills by name…" autocomplete="off">
+                <details class="skillBox settings-skill-box" id="skillBox" open>
+        <summary><span>◇</span> Skill pack <span id="skillCount" class="muted skill-count"></span></summary>
+        <div class="skillInner">
+          <label class="skillRow"><input type="checkbox" id="skillModeBox"> Index only (read files on demand)</label>
+          <label class="skillRow"><input type="checkbox" id="skillAll"> Send every file with each request</label>
+          <div id="skillList"></div>
+          <div id="skillView" class="skillView"></div>
+        </div>
+      </details>
+        </section></section>
+        <section class="settings-panel" data-settings-panel="agent"><div class="settings-page-heading"><span class="settings-kicker">AGENT BEHAVIOUR</span><h1>Agent</h1><p>Configure planning, reasoning and how the agent interacts with the editor.</p></div>
+        <section class="settings-card">
+          <div class="settings-card-heading">
+            <div><span class="settings-kicker">MODEL BEHAVIOUR</span><h3>Agent configuration</h3></div>
+            <span class="settings-icon">✳</span>
+          </div>
+          <div class="settings-fields">
+            <div class="setting-row setting-row-stacked">
+              <div><label for="thinking">Thinking mode</label><p>DeepSeek extended thinking. Other compatible providers use their standard request format.</p></div>
+              <select id="thinking" title="Thinking mode">
+                <option value="auto">Auto</option><option value="on">On</option><option value="off">Off</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <div><label for="modelRoute">Route routine steps to DeepSeek Flash</label><p>Use Flash for mechanical tool steps when DeepSeek is the active provider.</p></div>
+              <input type="checkbox" id="modelRoute" checked>
+            </div>
+            <div class="setting-row">
+              <div><label for="useTools">Agent tools and action loop</label><p>Allow the agent to edit scenes, manipulate elements, inspect frames and export video.</p></div>
+              <input type="checkbox" id="useTools" checked>
+            </div>
+            <p class="settings-inline-status" id="stepInfo"></p>
+          </div>
+        </section>
+        <section class="settings-card">
+          <div class="settings-card-heading">
+            <div><span class="settings-kicker">SESSION</span><h3>Conversation controls</h3></div>
+          </div>
+          <p class="settings-copy">Compact the current conversation to keep decisions and remove unnecessary raw tool output. Clearing the chat does not delete your video project.</p>
+          <div class="settings-button-row">
+            <button id="btnCompact" class="settings-secondary-button">Compact current session</button>
+            <button id="btnClearChat" class="settings-secondary-button">Clear conversation</button>
+          </div>
+        </section></section>
+        <section class="settings-panel" data-settings-panel="tools"><div class="settings-page-heading"><span class="settings-kicker">CAPABILITIES</span><h1>Tools</h1><p>Enable optional video editing, inspection and workflow tools.</p></div>
+        <section class="settings-card">
+          <div class="settings-card-heading"><div><span class="settings-kicker">TOOL ACCESS</span><h3>Agent tool library</h3></div></div>
+          <p class="settings-copy">Core safety, project-editing and recovery tools remain enabled. Optional tools can be activated here; the agent discovers enabled tools when needed.</p>
+          <div id="toolSettingsList" class="tool-settings-list"><div class="settings-loading">Loading available tools…</div></div>
+          <div class="settings-button-row"><button id="btnResetTools" class="settings-secondary-button">Reset optional tools</button></div>
+        </section></section>
+        <section class="settings-panel" data-settings-panel="audio"><div class="settings-page-heading"><span class="settings-kicker">MEDIA WORKSPACE</span><h1>Audio &amp; music</h1><p>Configure music, beat timing and sound effects for the active video.</p></div>
+        <section class="settings-card">
+          <div class="settings-card-heading"><div><span class="settings-kicker">SOUND & MUSIC</span><h3>Audio workspace</h3></div><span class="settings-icon">♫</span></div>
+          <p class="settings-copy">These are the same live music, beat and sound-effect controls used by the video editor. Changes are applied directly to the current project.</p>
+                  <div id="musicBox">
+          <h4>♫ Music &amp; beat</h4>
+          <div class="mrow musicOnly"><span>Track</span><b id="musName">none</b>
+            <label><input id="musOn" type="checkbox" checked> on</label></div>
+          <div class="btns musicOnly">
+            <button id="musPick" class="primary">＋ Music file</button>
+            <button id="musGen">✦ Make a beat</button>
+            <button id="musClear" class="ghost">Clear</button>
+          </div>
+          <div class="mrow musicOnly"><span>BPM</span><input id="musBpm" type="number" min="40" max="240" step="1" value="120">
+            <button id="musDetect" class="tiny">Detect</button></div>
+          <div class="mrow musicOnly"><span>Offset</span><input id="musOffset" type="number" min="-2" max="5" step="0.01" value="0"><span>s</span></div>
+          <div class="mrow musicOnly"><span>Volume</span><input id="musVol" type="range" min="0" max="1" step="0.01" value="0.8"></div>
+          <div class="mrow musicOnly"><span>Fade in</span><input id="musIn" type="range" min="0" max="4" step="0.1" value="0.3"></div>
+          <div class="mrow musicOnly"><span>Fade out</span><input id="musOut" type="range" min="0" max="4" step="0.1" value="0.6"></div>
+          <div class="mrow musicOnly"><span>Beats</span><label><input id="musGrid" type="checkbox" checked> Show grid on timeline</label></div>
+          <p class="muted2 musicOffNote">Music is <b>OFF</b> — music tools and agent music tools are hidden until you switch it on.</p>
+          <h4 class="sfx-heading">Sound effects</h4>
+          <div id="sfxList"></div>
+          <div class="btns sfx-buttons">
+            <button id="sfxAuto" class="primary">✦ Auto SFX</button>
+            <button id="sfxClear" class="ghost">Clear sounds</button>
+          </div>
+          <p class="muted2" id="musInfo">No track yet — add a music file, or let the agent make one. Beats drive beat-synced animation.</p>
+        </div>
+        </section></section>
+        <section class="settings-panel" data-settings-panel="advanced"><div class="settings-page-heading"><span class="settings-kicker">SYSTEM</span><h1>Advanced</h1><p>Manage local data, privacy and keyboard shortcuts.</p></div>
+        <section class="settings-card">
+          <div class="settings-card-heading"><div><span class="settings-kicker">LOCAL DATA</span><h3>Privacy and storage</h3></div></div>
+          <div class="settings-warning"><b>API key storage</b><p>Remembered keys are stored in this browser's localStorage. Anyone with access to this browser profile may be able to inspect them. For shared or production use, use a secure desktop credential store or a backend proxy.</p></div>
+          <div class="settings-fields">
+            <div class="setting-row"><div><label>Video project data</label><p>Projects are saved and loaded as JSON files using the editor's Save and Open actions.</p></div><span class="settings-value">Local files</span></div>
+            <div class="setting-row"><div><label>Preferences</label><p>Workspace preferences, skill selections and provider profiles are stored on this device.</p></div><span class="settings-value">localStorage</span></div>
+            <div class="settings-button-row"><button id="btnClearCredentials" class="settings-secondary-button">Clear all saved provider keys</button><button id="btnResetPreferences" class="settings-danger-button">Reset app preferences</button></div>
+            <div id="advancedStatus" class="settings-status" role="status"></div>
+          </div>
+        </section>
+        <section class="settings-card">
+          <div class="settings-card-heading"><div><span class="settings-kicker">KEYBOARD</span><h3>Shortcuts</h3></div></div>
+          <div class="shortcut-list">
+            <div><span>Play / pause</span><kbd>Space</kbd></div>
+            <div><span>Deselect / cancel</span><kbd>Esc</kbd></div>
+            <div><span>Undo</span><kbd>Ctrl / ⌘ + Z</kbd></div>
+            <div><span>Redo</span><kbd>Ctrl / ⌘ + Shift + Z</kbd></div>
+            <div><span>Move selected element</span><kbd>Arrow keys</kbd></div>
+            <div><span>Move by larger steps</span><kbd>Shift + Arrow</kbd></div>
+            <div><span>Send agent message</span><kbd>Ctrl / ⌘ + Enter</kbd></div>
+          </div>
+        </section></section>
+      </main>
+    </div>
+  </section>
+
   <main class="mainShell">
     <aside class="projectSidebar" aria-label="Workspace navigation">
       <div class="sidebar-brand">
@@ -73,7 +350,7 @@
           <span class="nav-symbol">◇</span><span>Skills library</span>
         </button>
         <button id="btnOpenSettings" class="sidebar-nav">
-          <span class="nav-symbol">⚙</span><span>Model &amp; connection</span>
+          <span class="nav-symbol">⚙</span><span>Settings</span>
         </button>
       </div>
 
@@ -121,55 +398,9 @@
         </div>
       </div>
 
-      <details class="agent-config" id="agentConfig">
-        <summary><span class="settings-summary-icon">⚙</span><span>Model &amp; connection</span><span class="settings-provider">DeepSeek</span></summary>
-        <div class="cfg">
-          <div class="config-field">
-            <label for="apiKey">API KEY</label>
-            <div class="row">
-              <input id="apiKey" type="password" placeholder="DeepSeek API key (sk-…)" autocomplete="off" spellcheck="false">
-              <button id="btnSaveKey" title="Save key in this browser">Save</button>
-              <button id="btnForgetKey" class="tiny" title="Forget stored key">×</button>
-            </div>
-          </div>
-          <div class="config-field">
-            <label for="model">MODEL</label>
-            <div class="row">
-              <select id="model" title="Model ID">
-                <option value="deepseek-v4-flash">deepseek-v4-flash (1M ctx)</option>
-                <option value="deepseek-v4-pro">deepseek-v4-pro (1M ctx)</option>
-                <option value="deepseek-chat">deepseek-chat (legacy)</option>
-                <option value="deepseek-reasoner">deepseek-reasoner (legacy)</option>
-              </select>
-              <button id="btnModels" title="Load model IDs from GET /models">↻</button>
-            </div>
-          </div>
-          <div class="config-field">
-            <label for="baseUrl">API BASE URL</label>
-            <div class="row">
-              <input id="baseUrl" value="https://api.deepseek.com" title="API base URL">
-              <select id="thinking" title="Thinking mode">
-                <option value="auto">Auto</option>
-                <option value="on">On</option>
-                <option value="off">Off</option>
-              </select>
-            </div>
-          </div>
-          <label class="skillRow"><input type="checkbox" id="rememberKey" checked> Remember key in this browser</label>
-          <label class="skillRow"><input type="checkbox" id="modelRoute" checked> Route routine steps to Flash <span class="muted">(lower cost)</span></label>
-          <label class="skillRow"><input type="checkbox" id="useTools" checked> Tools + agent loop <span class="muted" id="stepInfo"></span></label>
-        </div>
-      </details>
 
-      <details class="skillBox" id="skillBox">
-        <summary><span>◇</span> Skill pack <span id="skillCount" class="muted skill-count"></span></summary>
-        <div class="skillInner">
-          <label class="skillRow"><input type="checkbox" id="skillModeBox"> Index only (read files on demand)</label>
-          <label class="skillRow"><input type="checkbox" id="skillAll"> Send every file with each request</label>
-          <div id="skillList"></div>
-          <div id="skillView" class="skillView"></div>
-        </div>
-      </details>
+
+
 
       <div class="conversation-label"><span>Conversation</span><span class="conversation-hint">Your creative partner</span></div>
       <div id="chat" aria-live="polite"></div>
@@ -222,32 +453,6 @@
           <div><span class="inspector-eyebrow">WORKSPACE</span><strong>Inspector</strong></div>
           <span class="inspector-menu">···</span>
         </div>
-        <div id="musicBox">
-          <h4>♫ Music &amp; beat</h4>
-          <div class="mrow musicOnly"><span>Track</span><b id="musName">none</b>
-            <label><input id="musOn" type="checkbox" checked> on</label></div>
-          <div class="btns musicOnly">
-            <button id="musPick" class="primary">＋ Music file</button>
-            <button id="musGen">✦ Make a beat</button>
-            <button id="musClear" class="ghost">Clear</button>
-          </div>
-          <div class="mrow musicOnly"><span>BPM</span><input id="musBpm" type="number" min="40" max="240" step="1" value="120">
-            <button id="musDetect" class="tiny">Detect</button></div>
-          <div class="mrow musicOnly"><span>Offset</span><input id="musOffset" type="number" min="-2" max="5" step="0.01" value="0"><span>s</span></div>
-          <div class="mrow musicOnly"><span>Volume</span><input id="musVol" type="range" min="0" max="1" step="0.01" value="0.8"></div>
-          <div class="mrow musicOnly"><span>Fade in</span><input id="musIn" type="range" min="0" max="4" step="0.1" value="0.3"></div>
-          <div class="mrow musicOnly"><span>Fade out</span><input id="musOut" type="range" min="0" max="4" step="0.1" value="0.6"></div>
-          <div class="mrow musicOnly"><span>Beats</span><label><input id="musGrid" type="checkbox" checked> Show grid on timeline</label></div>
-          <p class="muted2 musicOffNote">Music is <b>OFF</b> — music tools and agent music tools are hidden until you switch it on.</p>
-          <h4 class="sfx-heading">Sound effects</h4>
-          <div id="sfxList"></div>
-          <div class="btns sfx-buttons">
-            <button id="sfxAuto" class="primary">✦ Auto SFX</button>
-            <button id="sfxClear" class="ghost">Clear sounds</button>
-          </div>
-          <p class="muted2" id="musInfo">No track yet — add a music file, or let the agent make one. Beats drive beat-synced animation.</p>
-        </div>
-
         <section class="inspector-section">
           <h3>Selected element</h3>
           <div id="itemBox"></div>
@@ -291,17 +496,6 @@
 <script src="../src/agent/model-streaming-context.js"></script>
 <script src="../src/agent/loop.js"></script>
 <script src="../src/agent/spec-bridge-and-boot.js"></script>
-<script>
-  (() => {
-    const togglePanel = (id) => {
-      const panel = document.getElementById(id);
-      if (!panel) return;
-      panel.open = !panel.open;
-      if (panel.open) panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    };
-    document.getElementById("btnOpenSkills")?.addEventListener("click", () => togglePanel("skillBox"));
-    document.getElementById("btnOpenSettings")?.addEventListener("click", () => togglePanel("agentConfig"));
-  })();
-</script>
+<script src="./redesign/settings.js"></script>
 </body>
 </html>
