@@ -61,6 +61,8 @@
       ...events.map(event => JSON.stringify(event))
     ].join(String.fromCharCode(10));
   }
+  window.AIVA_DEBUG = { log: debugLog, snapshot, report: reportText };
+
   function renderDebugReport(open) {
     const panel = $('debugPanel'), output = $('debugOutput');
     if (!panel || !output) return;
