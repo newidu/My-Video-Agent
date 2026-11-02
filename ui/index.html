@@ -3,180 +3,282 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Video Agent — Modular UI</title>
+<meta name="theme-color" content="#191918">
+<title>My Video Agent</title>
 <link rel="stylesheet" href="./styles/base.css">
+<link rel="stylesheet" href="./redesign/claude.css">
 </head>
 <body>
 <div class="app">
-  <header>
-    <div class="brand">
-      <span class="dotmark">◆</span>
-      <span>AI Video Agent<small>DeepSeek · create &amp; edit video</small></span>
+  <header class="topbar">
+    <div class="topbar-context">
+      <span class="topbar-mark" aria-hidden="true">✳</span>
+      <div class="topbar-product">
+        <strong>My Video Agent</strong>
+        <span>WORKSPACE</span>
+      </div>
+      <span class="crumb-separator">/</span>
+      <span class="crumb-current">Untitled project</span>
+      <span class="local-pill"><span></span> Local</span>
     </div>
-    <select id="formatSel" title="video format">
-      <option value="9:16">9:16 · 1080×1920</option>
-      <option value="16:9">16:9 · 1920×1080</option>
-      <option value="1:1">1:1 · 1080×1080</option>
-    </select>
-    <button id="btnPlay" class="primary">▶  Play</button>
-    <button id="btnRestart">↺ Restart</button>
-    <button id="btnUndo" class="tiny" title="undo (Ctrl+Z)">↶</button>
-    <button id="btnRedo" class="tiny" title="redo (Ctrl+Shift+Z)">↷</button>
-    <button id="btnLetter" class="primary">🔤 Letters: ON</button>
-    <button id="btnCrop">✂️ Cut / erase</button>
-    <button id="btnMusic">🎵 Music</button>
-    <button id="btnMusicOn" title="music on / off">🔊 Music ON</button>
-    <button id="btnFont">🔠 Font</button>
-    <button id="btnExport">⬇ Export</button>
-    <button id="btnPoster">🖼 Poster</button>
-    <div class="spacer"></div>
-    <span id="status"></span>
-    <span id="dlBox"></span>
-    <button id="btnSave" class="ghost">Save</button>
-    <button id="btnLoad" class="ghost">Load</button>
-    <button id="btnReset" class="ghost">Reset</button>
-    <input id="fileIn" type="file" accept="application/json" style="display:none">
-    <input id="musicIn" type="file" accept="audio/*" style="display:none">
-    <input id="fontIn" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" style="display:none">
+
+    <div class="topbar-controls">
+      <select id="formatSel" title="Video format" aria-label="Video format">
+        <option value="9:16">9:16 · Portrait</option>
+        <option value="16:9">16:9 · Landscape</option>
+        <option value="1:1">1:1 · Square</option>
+      </select>
+      <span class="toolbar-divider"></span>
+      <button id="btnUndo" class="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
+      <button id="btnRedo" class="icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+      <span class="toolbar-divider"></span>
+      <button id="btnPlay" class="primary play-button">▶ <span>Preview</span></button>
+      <button id="btnRestart" class="subtle-button" title="Restart preview">↺</button>
+      <button id="btnLetter" class="subtle-button">Aa <span>Letters: ON</span></button>
+      <button id="btnMusicOn" class="subtle-button">♫ <span>Music ON</span></button>
+      <span class="toolbar-divider"></span>
+      <button id="btnExport" class="primary export-button">Export video <span>↗</span></button>
+    </div>
+
+    <div class="topbar-feedback">
+      <span id="status"></span>
+      <span id="dlBox"></span>
+      <input id="fileIn" type="file" accept="application/json" hidden>
+      <input id="musicIn" type="file" accept="audio/*" hidden>
+      <input id="fontIn" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" hidden>
+    </div>
   </header>
 
-  <main>
+  <main class="mainShell">
+    <aside class="projectSidebar" aria-label="Workspace navigation">
+      <div class="sidebar-brand">
+        <span class="sidebar-logo" aria-hidden="true">✳</span>
+        <div><strong>My Video Agent</strong><small>Creative workspace</small></div>
+      </div>
+
+      <button id="btnClearChat" class="new-chat-button">
+        <span class="new-chat-icon">＋</span>
+        <span>New conversation</span>
+        <kbd>⌘ K</kbd>
+      </button>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">WORKSPACE</div>
+        <div class="sidebar-current">
+          <span class="nav-symbol">▧</span>
+          <span>Video editor</span>
+          <span class="current-indicator"></span>
+        </div>
+        <button id="btnOpenSkills" class="sidebar-nav">
+          <span class="nav-symbol">◇</span><span>Skills library</span>
+        </button>
+        <button id="btnOpenSettings" class="sidebar-nav">
+          <span class="nav-symbol">⚙</span><span>Model &amp; connection</span>
+        </button>
+      </div>
+
+      <div class="sidebar-section project-section">
+        <div class="sidebar-label">CURRENT PROJECT <span class="label-dot"></span></div>
+        <div class="project-tile">
+          <div class="project-file-icon">▣</div>
+          <div class="project-file-copy">
+            <strong>Untitled project</strong>
+            <small>Video workspace</small>
+          </div>
+        </div>
+        <div class="project-actions">
+          <button id="btnLoad" class="sidebar-file-button"><span>↥</span> Open</button>
+          <button id="btnSave" class="sidebar-file-button"><span>↓</span> Save</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section tools-section">
+        <div class="sidebar-label">QUICK TOOLS</div>
+        <div class="quick-tools">
+          <button id="btnCrop" class="quick-tool"><span class="quick-tool-icon">⌗</span><span>Cut / erase</span></button>
+          <button id="btnMusic" class="quick-tool"><span class="quick-tool-icon">♫</span><span>Music &amp; beats</span></button>
+          <button id="btnFont" class="quick-tool"><span class="quick-tool-icon">Aa</span><span>Fonts</span></button>
+          <button id="btnPoster" class="quick-tool"><span class="quick-tool-icon">▧</span><span>Poster</span></button>
+        </div>
+      </div>
+
+      <div class="sidebar-bottom">
+        <div class="sidebar-status"><span class="status-led"></span><span>Workspace ready</span></div>
+        <button id="btnReset" class="reset-button"><span>↻</span> Reset workspace</button>
+        <div class="sidebar-version"><span class="mini-avatar">V</span><span>Video Agent</span><span class="version-tag">DESKTOP</span></div>
+      </div>
+    </aside>
+
     <aside id="agentPane">
-      <div class="paneHead"><span class="badge">DeepSeek</span> Agent <span class="spacer"></span>
-        <span id="usage" class="usage" title="tokens used this session">— tok</span>
-        <button id="btnCompact" class="tiny" title="summarise this session now (keeps decisions, drops raw tool output)">compact</button>
-        <button id="btnClearChat" class="tiny" title="clear chat">clear</button>
+      <div class="paneHead agent-pane-head">
+        <div class="agent-heading">
+          <span class="agent-eyebrow">AI ASSISTANT</span>
+          <strong>Video agent</strong>
+        </div>
+        <div class="agent-head-actions">
+          <span id="usage" class="usage" title="Tokens used this session">— tok</span>
+          <button id="btnCompact" class="tiny icon-button" title="Summarise this session">⇲</button>
+        </div>
       </div>
-      <div class="cfg">
-        <div class="row">
-          <input id="apiKey" type="password" placeholder="DeepSeek API key (sk-…)" autocomplete="off" spellcheck="false">
-          <button id="btnSaveKey" title="save key in this browser">Save</button>
-          <button id="btnForgetKey" class="tiny" title="wipe the stored key from this browser">forget</button>
+
+      <details class="agent-config" id="agentConfig">
+        <summary><span class="settings-summary-icon">⚙</span><span>Model &amp; connection</span><span class="settings-provider">DeepSeek</span></summary>
+        <div class="cfg">
+          <div class="config-field">
+            <label for="apiKey">API KEY</label>
+            <div class="row">
+              <input id="apiKey" type="password" placeholder="DeepSeek API key (sk-…)" autocomplete="off" spellcheck="false">
+              <button id="btnSaveKey" title="Save key in this browser">Save</button>
+              <button id="btnForgetKey" class="tiny" title="Forget stored key">×</button>
+            </div>
+          </div>
+          <div class="config-field">
+            <label for="model">MODEL</label>
+            <div class="row">
+              <select id="model" title="Model ID">
+                <option value="deepseek-v4-flash">deepseek-v4-flash (1M ctx)</option>
+                <option value="deepseek-v4-pro">deepseek-v4-pro (1M ctx)</option>
+                <option value="deepseek-chat">deepseek-chat (legacy)</option>
+                <option value="deepseek-reasoner">deepseek-reasoner (legacy)</option>
+              </select>
+              <button id="btnModels" title="Load model IDs from GET /models">↻</button>
+            </div>
+          </div>
+          <div class="config-field">
+            <label for="baseUrl">API BASE URL</label>
+            <div class="row">
+              <input id="baseUrl" value="https://api.deepseek.com" title="API base URL">
+              <select id="thinking" title="Thinking mode">
+                <option value="auto">Auto</option>
+                <option value="on">On</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+          </div>
+          <label class="skillRow"><input type="checkbox" id="rememberKey" checked> Remember key in this browser</label>
+          <label class="skillRow"><input type="checkbox" id="modelRoute" checked> Route routine steps to Flash <span class="muted">(lower cost)</span></label>
+          <label class="skillRow"><input type="checkbox" id="useTools" checked> Tools + agent loop <span class="muted" id="stepInfo"></span></label>
         </div>
-        <div class="row">
-          <select id="model" title="model id">
-            <option value="deepseek-v4-flash">deepseek-v4-flash (1M ctx)</option>
-            <option value="deepseek-v4-pro">deepseek-v4-pro (1M ctx)</option>
-            <option value="deepseek-chat">deepseek-chat (legacy)</option>
-            <option value="deepseek-reasoner">deepseek-reasoner (legacy)</option>
-          </select>
-          <button id="btnModels" title="load model ids from GET /models">↻</button>
-        </div>
-        <div class="row">
-          <input id="baseUrl" value="https://api.deepseek.com" title="API base URL">
-          <select id="thinking" title="thinking mode">
-            <option value="auto">think: auto</option>
-            <option value="on">think: on</option>
-            <option value="off">think: off</option>
-          </select>
-        </div>
-        <label class="skillRow" style="gap:8px" title="untick to keep the key in memory only (gone when the tab closes) — the key itself is never written into this HTML file">
-          <input type="checkbox" id="rememberKey" checked> remember key in this browser
-        </label>
-        <label class="skillRow" style="gap:8px" title="planning step runs on the model you picked; the mechanical tool steps run on deepseek-v4-flash">
-          <input type="checkbox" id="modelRoute" checked> route routine steps to flash <span class="muted">(cheaper)</span>
-        </label>
-        <label class="skillRow" style="gap:8px">
-          <input type="checkbox" id="useTools" checked> tools + agent loop
-          <span class="muted" style="margin-left:auto" id="stepInfo"></span>
-        </label>
-      </div>
+      </details>
+
       <details class="skillBox" id="skillBox">
-        <summary>📚 Skill pack <span id="skillCount" class="muted" style="font-weight:500"></span></summary>
+        <summary><span>◇</span> Skill pack <span id="skillCount" class="muted skill-count"></span></summary>
         <div class="skillInner">
-          <label class="skillRow"><input type="checkbox" id="skillModeBox"> index only (read files on demand — cheapest)</label>
-          <label class="skillRow"><input type="checkbox" id="skillAll"> send every file with each request</label>
+          <label class="skillRow"><input type="checkbox" id="skillModeBox"> Index only (read files on demand)</label>
+          <label class="skillRow"><input type="checkbox" id="skillAll"> Send every file with each request</label>
           <div id="skillList"></div>
           <div id="skillView" class="skillView"></div>
         </div>
       </details>
-      <div id="chat"></div>
-      <div class="composer">
-        <textarea id="prompt" placeholder="Describe any video — e.g. a 10 second 9:16 explainer for a solar startup: 3 scenes, one idea each, calm editorial look…"></textarea>
-        <div class="row">
-          <button id="btnSend" class="primary">Send to agent</button>
-          <button id="btnStop">Stop</button>
+
+      <div class="conversation-label"><span>Conversation</span><span class="conversation-hint">Your creative partner</span></div>
+      <div id="chat" aria-live="polite"></div>
+
+      <div class="composer-shell">
+        <div class="composer">
+          <div class="composer-label"><span class="composer-pulse"></span> MESSAGE YOUR AGENT</div>
+          <textarea id="prompt" placeholder="Describe the video you want to create or the edit you need…&#10;&#10;Try: Make this a 15-second vertical promo with bold captions."></textarea>
+          <div class="composer-toolbar">
+            <label class="attach-video" title="Add a source video">＋ <span>Video</span>
+              <input id="fileVideo" type="file" accept="video/*" hidden>
+            </label>
+            <span class="composer-shortcut">Enter to send</span>
+            <button id="btnStop" class="stop-button">Stop</button>
+            <button id="btnSend" class="primary send-button">Run agent <span>↑</span></button>
+          </div>
+          <p id="agentStatus" class="muted small"></p>
         </div>
-        <label class="filebtn">🎬 Add my video (mp4/webm) — then edit it here
-          <input id="fileVideo" type="file" accept="video/*" style="display:none">
-        </label>
-        <p id="agentStatus" class="muted small" style="margin:0"></p>
       </div>
     </aside>
 
-    <section class="center">
-      <div id="stageWrap">
-        <div class="stageInner" id="stageInner">
-          <canvas id="stage" width="1080" height="1920"></canvas>
-          <canvas id="overlay" width="1080" height="1920"></canvas>
-          <div class="cropPick" id="cropPick">
-            <p>This area — what now?<br><span style="color:#6c7d92">Elements under the box are removed for the whole clip.</span></p>
-            <button id="cpCut" class="primary">✂️ Cut out &amp; move it</button>
-            <button id="cpErase">🧽 Erase it (remove for real)</button>
-            <button id="cpCancel" class="ghost">✕ Cancel</button>
+    <section class="editorWorkspace" aria-label="Video editing workspace">
+      <section class="center">
+        <div class="preview-toolbar">
+          <div class="preview-heading"><span class="preview-live-dot"></span><span class="preview-label">PREVIEW</span><strong>Canvas</strong></div>
+          <span class="preview-context">Live composition</span>
+        </div>
+        <div id="stageWrap">
+          <div class="stageInner" id="stageInner">
+            <canvas id="stage" width="1080" height="1920"></canvas>
+            <canvas id="overlay" width="1080" height="1920"></canvas>
+            <div class="cropPick" id="cropPick">
+              <p>This area — what now?<br><span>Elements under the box are removed for the whole clip.</span></p>
+              <button id="cpCut" class="primary">✂ Cut out &amp; move it</button>
+              <button id="cpErase">Erase it (remove for real)</button>
+              <button id="cpCancel" class="ghost">Cancel</button>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="transport">
-        <canvas id="beatbar" height="14" title="beat grid"></canvas>
-        <button id="btnStart" class="tiny">⏮</button>
-        <input id="scrub" type="range" min="0" max="4" step="0.0333" value="0">
-        <span id="clock">0.00s</span>
-      </div>
-    </section>
+        <div class="transport">
+          <canvas id="beatbar" height="14" title="Beat grid"></canvas>
+          <button id="btnStart" class="tiny icon-button" title="Go to start">|◀</button>
+          <input id="scrub" type="range" min="0" max="4" step="0.0333" value="0" aria-label="Timeline position">
+          <span id="clock">0.00s</span>
+        </div>
+      </section>
 
-    <aside id="editPane">
-      <div id="musicBox">
-        <h4>🎵 Music &amp; beat</h4>
-        <div class="mrow musicOnly"><span>Track</span><b id="musName" style="font-weight:600;color:var(--txt)">none</b>
-          <label style="display:flex;gap:6px;align-items:center;margin-left:auto;color:var(--txt)">
-            <input id="musOn" type="checkbox" checked> on</label></div>
-        <div class="btns musicOnly" style="margin:6px 0 8px">
-          <button id="musPick" class="primary">⤒ Music file</button>
-          <button id="musGen">✨ Make a beat</button>
-          <button id="musClear" class="ghost">✕ Clear</button>
+      <aside id="editPane">
+        <div class="inspector-header">
+          <div><span class="inspector-eyebrow">WORKSPACE</span><strong>Inspector</strong></div>
+          <span class="inspector-menu">···</span>
         </div>
-        <div class="mrow musicOnly"><span>BPM</span><input id="musBpm" type="number" min="40" max="240" step="1" value="120">
-          <button id="musDetect" class="tiny">detect</button></div>
-        <div class="mrow musicOnly"><span>Offset</span><input id="musOffset" type="number" min="-2" max="5" step="0.01" value="0">
-          <span style="min-width:auto">s</span></div>
-        <div class="mrow musicOnly"><span>Volume</span><input id="musVol" type="range" min="0" max="1" step="0.01" value="0.8"></div>
-        <div class="mrow musicOnly"><span>Fade in</span><input id="musIn" type="range" min="0" max="4" step="0.1" value="0.3"></div>
-        <div class="mrow musicOnly"><span>Fade out</span><input id="musOut" type="range" min="0" max="4" step="0.1" value="0.6"></div>
-        <div class="mrow musicOnly"><span>Beats</span>
-          <label style="display:flex;gap:6px;align-items:center;color:var(--txt)"><input id="musGrid" type="checkbox" checked> show grid on the timeline</label></div>
-        <p class="muted2 musicOffNote">Music is <b>OFF</b> — the music tools are hidden here and the agent cannot see
-          <code>set_music</code> / <code>beat_map</code> either. Switch it back on to bring them back.</p>
-        <h4 style="margin-top:12px">🔊 Sound effects</h4>
-        <div id="sfxList"></div>
-        <div class="btns" style="margin-top:6px">
-          <button id="sfxAuto" class="primary">✨ Auto SFX</button>
-          <button id="sfxClear" class="ghost">✕ Clear sounds</button>
+        <div id="musicBox">
+          <h4>♫ Music &amp; beat</h4>
+          <div class="mrow musicOnly"><span>Track</span><b id="musName">none</b>
+            <label><input id="musOn" type="checkbox" checked> on</label></div>
+          <div class="btns musicOnly">
+            <button id="musPick" class="primary">＋ Music file</button>
+            <button id="musGen">✦ Make a beat</button>
+            <button id="musClear" class="ghost">Clear</button>
+          </div>
+          <div class="mrow musicOnly"><span>BPM</span><input id="musBpm" type="number" min="40" max="240" step="1" value="120">
+            <button id="musDetect" class="tiny">Detect</button></div>
+          <div class="mrow musicOnly"><span>Offset</span><input id="musOffset" type="number" min="-2" max="5" step="0.01" value="0"><span>s</span></div>
+          <div class="mrow musicOnly"><span>Volume</span><input id="musVol" type="range" min="0" max="1" step="0.01" value="0.8"></div>
+          <div class="mrow musicOnly"><span>Fade in</span><input id="musIn" type="range" min="0" max="4" step="0.1" value="0.3"></div>
+          <div class="mrow musicOnly"><span>Fade out</span><input id="musOut" type="range" min="0" max="4" step="0.1" value="0.6"></div>
+          <div class="mrow musicOnly"><span>Beats</span><label><input id="musGrid" type="checkbox" checked> Show grid on timeline</label></div>
+          <p class="muted2 musicOffNote">Music is <b>OFF</b> — music tools and agent music tools are hidden until you switch it on.</p>
+          <h4 class="sfx-heading">Sound effects</h4>
+          <div id="sfxList"></div>
+          <div class="btns sfx-buttons">
+            <button id="sfxAuto" class="primary">✦ Auto SFX</button>
+            <button id="sfxClear" class="ghost">Clear sounds</button>
+          </div>
+          <p class="muted2" id="musInfo">No track yet — add a music file, or let the agent make one. Beats drive beat-synced animation.</p>
         </div>
-        <p class="muted2" id="musInfo">No track yet — add a music file, or let the agent make one. Beats drive <b>anim:"beat"</b> and <code>beatEnv(t)</code> in scene code.</p>
-      </div>
-      <h3>Selected element</h3>
-      <div id="itemBox"></div>
-      <h3>Scenes</h3>
-      <div id="sceneList"></div>
-      <h3>Elements on this frame <span class="muted" style="text-transform:none;letter-spacing:0">— click to select</span></h3>
-      <div id="elList"></div>
-      <h3>Your edits</h3>
-      <div id="itemList"></div>
-      <div id="help">
-        Nothing here is a template: the agent writes the scenes (and the drawing code for its icons) from the skill pack.
-        <br><strong>Click</strong> any text / shape / drawn icon on the video, then type, drag, <kbd>Del</kbd> — icons open their <em>code</em> in the panel, editable live.
-        <br><strong>Letters</strong> ON → click a single letter (double-click = whole word).
-        <br><strong>✂️ Cut / erase</strong> → drag a box, then cut it out or erase it for real.
-        <br><kbd>Space</kbd> play · <kbd>Esc</kbd> deselect · arrows nudge (⇧ = bigger steps).
-      </div>
-    </aside>
+
+        <section class="inspector-section">
+          <h3>Selected element</h3>
+          <div id="itemBox"></div>
+        </section>
+        <section class="inspector-section">
+          <h3>Scenes</h3>
+          <div id="sceneList"></div>
+        </section>
+        <section class="inspector-section">
+          <h3>Elements on this frame <span>· click to select</span></h3>
+          <div id="elList"></div>
+        </section>
+        <section class="inspector-section">
+          <h3>Your edits</h3>
+          <div id="itemList"></div>
+        </section>
+        <div id="help">
+          <strong>Quick tips</strong>
+          <p>Click any text, shape or icon on the video to select it. Drag to move, press <kbd>Del</kbd> to remove.</p>
+          <p>Letters ON lets you select a single letter. Double-click to select a whole word.</p>
+          <p>Use Cut / erase to select an area, then cut it out or remove it.</p>
+          <p><kbd>Space</kbd> play · <kbd>Esc</kbd> deselect · Arrow keys nudge · <kbd>Shift</kbd> for larger steps.</p>
+        </div>
+      </aside>
+    </section>
   </main>
 
   <audio id="snd"></audio>
 </div>
 
-<!-- The classic scripts intentionally load in order. Their global bindings share the original engine scope. -->
+<!-- Keep the engine's classic-script order: modules share the original global scope. -->
 <script src="../src/skills/skill-manifest.js"></script>
 <script src="../src/canvas/primitives.js"></script>
 <script src="../src/canvas/scene-engine.js"></script>
@@ -189,5 +291,17 @@
 <script src="../src/agent/model-streaming-context.js"></script>
 <script src="../src/agent/loop.js"></script>
 <script src="../src/agent/spec-bridge-and-boot.js"></script>
+<script>
+  (() => {
+    const togglePanel = (id) => {
+      const panel = document.getElementById(id);
+      if (!panel) return;
+      panel.open = !panel.open;
+      if (panel.open) panel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    };
+    document.getElementById("btnOpenSkills")?.addEventListener("click", () => togglePanel("skillBox"));
+    document.getElementById("btnOpenSettings")?.addEventListener("click", () => togglePanel("agentConfig"));
+  })();
+</script>
 </body>
 </html>
