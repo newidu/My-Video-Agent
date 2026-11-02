@@ -4,7 +4,7 @@
   const $ = id => document.getElementById(id);
   const PREFIX = 'aiva_provider_';
   const PROVIDERS = {
-    deepseek: { label:'DeepSeek', base:'https://api.deepseek.com', model:'deepseek-v4-flash', auth:true, description:'DeepSeek chat-completions API with its extended-thinking option.' },
+    deepseek: { label:'DeepSeek', base:'https://api.deepseek.com', model:'deepseek-flash', auth:true, description:'DeepSeek V4.1 Flash chat-completions API with its extended-thinking option.' },
     openai: { label:'OpenAI', base:'https://api.openai.com/v1', model:'gpt-4.1-mini', auth:true, description:'OpenAI-compatible Chat Completions API. Select an available model from your account.' },
     openrouter: { label:'OpenRouter', base:'https://openrouter.ai/api/v1', model:'openai/gpt-4.1-mini', auth:true, description:'OpenRouter unified model gateway. Use a model slug available to your account.' },
     groq: { label:'Groq', base:'https://api.groq.com/openai/v1', model:'llama-3.3-70b-versatile', auth:true, description:'Groq OpenAI-compatible endpoint. Model availability can change; load the current list.' },
@@ -78,7 +78,13 @@
     activeProvider = PROVIDERS[id] ? id : 'deepseek';
     const def = PROVIDERS[activeProvider];
     const base = getStorage(profileKey(activeProvider,'base')) || (activeProvider === 'deepseek' ? getStorage('aiva_base') || def.base : def.base);
-    const model = getStorage(profileKey(activeProvider,'model')) || (activeProvider === 'deepseek' ? getStorage('aiva_model') || def.model : def.model);
+    const storedModel = getStorage(profileKey(activeProvider,'model')) || (activeProvider === 'deepseek' ? getStorage('aiva_model') || def.model : def.model);
+    const legacyDeepSeekModels = { 'deepseek-v4-flash':'deepseek-flash', 'deepseek-chat':'deepseek-flash', 'deepseek-reasoner':'deepseek-v4-pro' };
+    const model = activeProvider === 'deepseek' ? (legacyDeepSeekModels[storedModel] || storedModel) : storedModel;
+    if (model !== storedModel) {
+      setStorage(profileKey(activeProvider,'model'), model);
+      if (activeProvider === 'deepseek') setStorage('aiva_model', model);
+    }
     $('baseUrl').value = base || '';
     if (model) {
       if (![...$('model').options].some(o => o.value === model)) {
@@ -251,7 +257,9 @@
       thinkingEnabled = !thinkingEnabled;
       setStorage('aiva_composer_thinking',thinkingEnabled ? '1' : '0');
       syncThinkingToggle();
-      debugLog('thinking_toggle_changed', { before: wasEnabled, enabled: thinkingEnabled, provider: activeProvider });
+      if (window.AIVA_DEBUG && window.AIVA_DEBUG.log) {
+        window.AIVA_DEBUG.log('thinking_toggle_changed', { before: wasEnabled, enabled: thinkingEnabled, provider: activeProvider });
+      }
     });
     syncThinkingToggle();
   }
