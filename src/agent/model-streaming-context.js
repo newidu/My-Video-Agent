@@ -153,7 +153,7 @@ function validVideoBuildSpec(spec) {
     spec.scenes.every(scene =>
       scene && typeof scene === 'object' &&
       Number.isFinite(Number(scene.dur)) && Number(scene.dur) > 0 &&
-      Array.isArray(scene.elements) && scene.elements.length <= 40 &&
+      Array.isArray(scene.elements) && scene.elements.length > 0 && scene.elements.length <= 40 &&
       scene.elements.every(element => element && (element.type === 'text' || element.type === 'code'))
     )
   );
@@ -181,9 +181,14 @@ async function buildVideoWithRecovery(messages, tools, onState, signal, original
     return { content: '', toolCalls: [], usage: null };
   }
 
-  const base = (messages || []).filter(message =>
-    message && (message.role === 'system' || message.role === 'user' || message.role === 'assistant')
-  ).slice(-12);
+  const systemMessage = (messages || []).find(message => message && message.role === 'system');
+  const history = (messages || []).filter(message =>
+    message && message !== systemMessage && (message.role === 'user' || message.role === 'assistant') &&
+    typeof message.content === 'string'
+  ).slice(-10);
+  const base = [];
+  if (systemMessage) base.push(systemMessage);
+  base.push(...history);
   base.push({
     role: 'system',
     content:
