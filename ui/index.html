@@ -73,7 +73,7 @@
         <button class="settings-nav-item" data-settings-target="advanced"><span>⌘</span> Advanced</button>
         <div class="settings-nav-footer"><span class="settings-online-dot"></span><span>Settings stored on this device</span></div>
       </nav>
-      <main class="settings-content">
+      <div class="settings-content" role="main">
         <section class="settings-panel active" data-settings-panel="general">
           <div class="settings-page-heading"><span class="settings-kicker">PREFERENCES</span><h1>General</h1><p>Manage how My Video Agent opens and remembers your workspace.</p></div>
           <section class="settings-card">
@@ -257,10 +257,7 @@
             <div><span class="settings-kicker">SESSION</span><h3>Conversation controls</h3></div>
           </div>
           <p class="settings-copy">Compact the current conversation to keep decisions and remove unnecessary raw tool output. Clearing the chat does not delete your video project.</p>
-          <div class="settings-button-row">
-            <button id="btnCompact" class="settings-secondary-button">Compact current session</button>
-            <button id="btnClearChat" class="settings-secondary-button">Clear conversation</button>
-          </div>
+          <p class="settings-copy">Use the compact control in the agent chat header to summarise the current session, or use New conversation in the workspace sidebar to clear the chat.</p>
         </section></section>
         <section class="settings-panel" data-settings-panel="tools"><div class="settings-page-heading"><span class="settings-kicker">CAPABILITIES</span><h1>Tools</h1><p>Enable optional video editing, inspection and workflow tools.</p></div>
         <section class="settings-card">
@@ -322,7 +319,7 @@
             <div><span>Send agent message</span><kbd>Ctrl / ⌘ + Enter</kbd></div>
           </div>
         </section></section>
-      </main>
+      </div>
     </div>
   </section>
 
