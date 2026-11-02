@@ -30,7 +30,7 @@ if ((cssText.match(/\{/g) || []).length !== (cssText.match(/\}/g) || []).length)
 const settingsHtmlIds = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map(m => m[1]);
 const duplicateIds = [...new Set(settingsHtmlIds.filter((id, i) => settingsHtmlIds.indexOf(id) !== i))];
 if (duplicateIds.length) throw new Error('Duplicate UI element IDs: ' + duplicateIds.join(', '));
-for (const id of ['settingsView','btnCloseSettings','btnOpenSettings','providerPreset','apiKey','baseUrl','model','skillBox','toolSettingsList','musicBox','settingDefaultFormat','settingExportBitrate','manualModel','btnFontSettings','btnThinkingToggle','thinkingToggleState']) {
+for (const id of ['settingsView','btnCloseSettings','btnOpenSettings','providerPreset','apiKey','baseUrl','model','skillBox','toolSettingsList','musicBox','settingDefaultFormat','settingExportBitrate','manualModel','btnFontSettings','btnThinkingToggle','thinkingToggleState','btnCopyDebug']) {
  if (!settingsHtmlIds.includes(id)) throw new Error('Settings UI is missing required element: ' + id);
 }
 const legacyControls = html.match(/<div id="legacyEditorControls" hidden>([\s\S]*?)<\/div>/);
@@ -46,6 +46,8 @@ const agentTools = fs.readFileSync(path.join(root, 'src', 'agent', 'tools.js'),'
 const agentSession = fs.readFileSync(path.join(root, 'src', 'agent', 'session-and-skills.js'),'utf8');
 if (!modelStream.includes('async function buildVideoWithRecovery') || !modelStream.includes("choice: 'required'")) throw new Error('Video build recovery must live in the model transport and request required tool calls.');
 if (!settingsController.includes('aiva_composer_thinking') || !settingsController.includes('function syncThinkingToggle') || !settingsController.includes("thinkingEnabled && !forcedToolCall ? 'enabled' : 'disabled'")) throw new Error('Composer Thinking ON/OFF must persist and control DeepSeek request options.');
+if (!settingsController.includes('function debugReport()') || !settingsController.includes('async function copyDebugReport()') || !settingsController.includes("debugLog('model_request'") || !settingsController.includes("debugLog('model_api_error'") || !settingsController.includes("debugLog('agent_step'")) throw new Error('Copy Debug must capture model requests, API errors, and agent step/thinking events.');
+if (!settingsController.includes('prompt text, API keys and project media are not included')) throw new Error('Debug report privacy notice is missing.');
 if (settingsController.includes('installToolCallRecovery')) throw new Error('Model recovery must not be owned by the Settings UI.');
 if (!modelStream.includes('responseFormat: { type: \'json_object\' }') || !modelStream.includes('validVideoBuildSpec')) throw new Error('JSON-output fallback and video spec validation are missing.');
 if (!agentLoop.includes('buildVideoWithRecovery(messages, tools')) throw new Error('The agent loop does not call the first-class video build recovery.');

@@ -34,6 +34,66 @@
   let startupReady = false;
   let thinkingEnabled = false;
   const nativeFetch = window.fetch.bind(window);
+  const DEBUG_LOG = [];
+  const DEBUG_LIMIT = 80;
+  let lastLoggedStep = '';
+
+  function debugLog(event, details) {
+    const item = { time: new Date().toISOString(), event: String(event || 'event'), details: details || {} };
+    DEBUG_LOG.push(item);
+    if (DEBUG_LOG.length > DEBUG_LIMIT) DEBUG_LOG.splice(0, DEBUG_LOG.length - DEBUG_LIMIT);
+    try { console.debug('[My Video Agent debug]', item); } catch (e) {}
+  }
+  function safeEndpoint(value) {
+    try { const u = new URL(String(value || '')); return u.origin + u.pathname; }
+    catch (e) { return String(value || '').split('?')[0].slice(0,180); }
+  }
+  function debugSnapshot() {
+    const read = id => { const el = $(id); return el ? String(el.value || '') : ''; };
+    const checked = id => { const el = $(id); return !!(el && el.checked); };
+    return {
+      app: 'My Video Agent', capturedAt: new Date().toISOString(),
+      page: location.origin + location.pathname, userAgent: navigator.userAgent,
+      provider: activeProvider, model: read('model'), apiEndpoint: safeEndpoint(read('baseUrl')),
+      apiKeyPresent: !!(window.apiKey && window.apiKey()),
+      thinkingToggle: { enabled: thinkingEnabled, uiState: $('thinkingToggleState') ? $('thinkingToggleState').textContent : 'missing', disabled: !!($('btnThinkingToggle') && $('btnThinkingToggle').disabled) },
+      agentThinkingSelect: read('thinking'), thinkingOverride: window.THINK_OVERRIDE == null ? null : window.THINK_OVERRIDE,
+      modelOverride: window.MODEL_OVERRIDE == null ? null : window.MODEL_OVERRIDE,
+      routeToCheapModel: checked('modelRoute'), agentToolsEnabled: checked('useTools'),
+      stepInfo: read('stepInfo'),
+      agentStatus: $('agentStatus') ? $('agentStatus').textContent.slice(0,500) : '',
+      appStatus: $('status') ? $('status').textContent.slice(0,300) : '',
+      diagnosticsCount: DEBUG_LOG.length
+    };
+  }
+  function debugReport() {
+    return ['MY VIDEO AGENT — DEBUG REPORT',
+      'Privacy: prompt text, API keys and project media are not included.',
+      JSON.stringify(debugSnapshot(), null, 2), 'RECENT EVENTS (oldest first)',
+      ...DEBUG_LOG.map(item => JSON.stringify(item))].join(String.fromCharCode(10));
+  }
+  async function copyDebugReport() {
+    const report = debugReport(), button = $('btnCopyDebug');
+    try {
+      if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(report);
+      else {
+        const field = document.createElement('textarea');
+        field.value = report; field.setAttribute('readonly','');
+        field.style.position = 'fixed'; field.style.opacity = '0'; field.style.pointerEvents = 'none';
+        document.body.appendChild(field); field.select(); field.setSelectionRange(0,field.value.length);
+        const copied = document.execCommand('copy'); field.remove();
+        if (!copied) throw new Error('Clipboard permission was denied by this browser.');
+      }
+      debugLog('debug_report_copied', { eventCount: DEBUG_LOG.length });
+      if (button) { button.classList.add('copied'); button.innerHTML = '✓ <span>Copied</span>'; }
+      if ($('agentStatus')) $('agentStatus').textContent = 'Debug report copied. Paste it into your ChatGPT conversation.';
+    } catch (error) {
+      debugLog('debug_report_copy_failed', { message: String(error && error.message || error) });
+      if ($('agentStatus')) $('agentStatus').textContent = 'Could not copy automatically. Allow clipboard access and try again.';
+      try { window.prompt('Copy this debug report manually (Ctrl+C):', report); } catch (e) {}
+    }
+  }
+  window.AIVA_DEBUG = { log: debugLog, snapshot: debugSnapshot, report: debugReport };
 
   function profileKey(id, suffix) { return PREFIX + id + '_' + suffix; }
   function getStorage(key) { try { return localStorage.getItem(key) || ''; } catch (e) { return ''; } }
@@ -197,22 +257,102 @@
   /* A compatible endpoint may reject DeepSeek-only extensions; normalize requests
      without changing the engine's streaming parser or its tool-call behavior. */
   window.fetch = (input, init) => {
+    let requestInfo = null;
     try {
       const url = typeof input === 'string' ? input : (input && input.url) || '';
-      if (init && init.body && /\/chat\/completions(?:\?|$)/.test(url)) {
+      if (init && init.body && url.includes('/chat/completions')) {
         const body = JSON.parse(init.body);
         if (activeProvider === 'deepseek') {
           const forcedToolCall = !!(body.tool_choice && body.tool_choice !== 'auto');
           body.thinking = { type: thinkingEnabled && !forcedToolCall ? 'enabled' : 'disabled' };
+          requestInfo = {
+            provider: activeProvider, model: body.model || '', endpoint: safeEndpoint(url),
+            thinkingSent: body.thinking.type, toggleAtRequest: thinkingEnabled,
+            thinkingSelect: $('thinking') ? $('thinking').value : 'missing',
+            thinkingOverride: window.THINK_OVERRIDE == null ? null : window.THINK_OVERRIDE,
+            modelOverride: window.MODEL_OVERRIDE == null ? null : window.MODEL_OVERRIDE,
+            toolChoice: typeof body.tool_choice === 'string' ? body.tool_choice : (body.tool_choice ? 'named/function' : 'none'),
+            forcedToolCall, stream: !!body.stream
+          };
         } else {
-          delete body.thinking;
-          delete body.stream_options;
+          delete body.thinking; delete body.stream_options;
+          requestInfo = {
+            provider: activeProvider, model: body.model || '', endpoint: safeEndpoint(url),
+            thinkingSent: 'provider-default (DeepSeek option omitted)', toggleAtRequest: thinkingEnabled,
+            toolChoice: typeof body.tool_choice === 'string' ? body.tool_choice : (body.tool_choice ? 'named/function' : 'none'),
+            stream: !!body.stream
+          };
         }
         init = Object.assign({},init,{body:JSON.stringify(body)});
+        debugLog('model_request', requestInfo);
       }
-    } catch (e) {}
-    return nativeFetch(input,init);
+    } catch (error) {
+      debugLog('request_instrumentation_error', { message: String(error && error.message || error) });
+    }
+    return nativeFetch(input,init).then(response => {
+      if (requestInfo) {
+        debugLog('model_response', { status: response.status, ok: response.ok, contentType: response.headers.get('content-type') || '' });
+        if (!response.ok) {
+          response.clone().text().then(raw => {
+            let message = String(raw || '').slice(0,1200);
+            const key = rawKey();
+            if (key) message = message.split(key).join('[REDACTED_API_KEY]');
+            message = message.replace(/(?:sk-|Bearer[ 	]+)[A-Za-z0-9._-]{16,}/gi,'[REDACTED_TOKEN]');
+            debugLog('model_api_error', { status: response.status, body: message });
+          }).catch(error => debugLog('response_body_read_error', { message: String(error && error.message || error) }));
+        }
+      }
+      return response;
+    }).catch(error => {
+      if (requestInfo) debugLog('model_fetch_failed', { message: String(error && error.message || error), name: error && error.name || '' });
+      throw error;
+    });
   };
+
+  const copyDebugButton = $('btnCopyDebug');
+  if (copyDebugButton) copyDebugButton.addEventListener('click', copyDebugReport);
+  const thinkingDebugButton = $('btnThinkingToggle');
+  if (thinkingDebugButton) thinkingDebugButton.addEventListener('click', () => {
+    debugLog('thinking_toggle_clicked', { enabled: thinkingEnabled, disabled: thinkingDebugButton.disabled, provider: activeProvider });
+  }, true);
+  const sendDebugButton = $('btnSend');
+  if (sendDebugButton) sendDebugButton.addEventListener('click', () => {
+    const prompt = $('prompt');
+    debugLog('agent_task_submitted', {
+      promptLength: prompt ? prompt.value.trim().length : 0,
+      thinkingToggle: thinkingEnabled, thinkingSelect: $('thinking') ? $('thinking').value : 'missing',
+      provider: activeProvider, model: $('model') ? $('model').value : ''
+    });
+  }, true);
+  const promptDebugInput = $('prompt');
+  if (promptDebugInput) promptDebugInput.addEventListener('keydown', event => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      debugLog('agent_task_submitted_keyboard', {
+        promptLength: promptDebugInput.value.trim().length,
+        thinkingToggle: thinkingEnabled, thinkingSelect: $('thinking') ? $('thinking').value : 'missing',
+        provider: activeProvider, model: $('model') ? $('model').value : ''
+      });
+    }
+  }, true);
+  const stopDebugButton = $('btnStop');
+  if (stopDebugButton) stopDebugButton.addEventListener('click', () => debugLog('agent_stop_clicked', {}), true);
+  if (window.MutationObserver && $('stepInfo')) {
+    new MutationObserver(() => {
+      const value = $('stepInfo').textContent.trim();
+      if (value && value !== lastLoggedStep) {
+        lastLoggedStep = value;
+        debugLog('agent_step', { label: value, thinkingOverride: window.THINK_OVERRIDE == null ? null : window.THINK_OVERRIDE });
+      }
+    }).observe($('stepInfo'), { childList:true, subtree:true, characterData:true });
+  }
+  window.addEventListener('error', event => debugLog('window_error', {
+    message: String(event.message || 'Unknown error').slice(0,500),
+    source: String(event.filename || '').split('?')[0].slice(-180),
+    line: event.lineno || null, column: event.colno || null
+  }));
+  window.addEventListener('unhandledrejection', event => debugLog('unhandled_rejection', {
+    message: String(event.reason && event.reason.message || event.reason || 'Unknown rejection').slice(0,700)
+  }));
 
   const originalAgentStatus = window.agentStatus;
   if (typeof originalAgentStatus === 'function') {
@@ -261,9 +401,11 @@
   if (thinkingToggle) {
     thinkingToggle.addEventListener('click',() => {
       if (activeProvider !== 'deepseek') return;
+      const wasEnabled = thinkingEnabled;
       thinkingEnabled = !thinkingEnabled;
       setStorage('aiva_composer_thinking',thinkingEnabled ? '1' : '0');
       syncThinkingToggle();
+      debugLog('thinking_toggle_changed', { before: wasEnabled, enabled: thinkingEnabled, provider: activeProvider });
     });
     syncThinkingToggle();
   }
