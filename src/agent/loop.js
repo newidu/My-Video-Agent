@@ -82,7 +82,32 @@ async function runAgent(userText) {
   let lastPromptTokens = 0;
   try {
     let lastSig = '', repeat = 0;
-    for (let step = 0; step < SAFE_CAP; step++) {
+    let buildHandledBeforeLoop = false;
+    let buildFailedBeforeLoop = false;
+
+    if (newVideoBuild && tools) {
+      buildHandledBeforeLoop = true;
+      cur = beginStep(bubble);
+      cur.body.textContent = 'Building video…';
+      $('stepInfo').textContent = 'creating first video pass';
+      const firstBuild = await buildVideoWithRecovery(messages, tools, render, ABORT.signal, userText);
+      addUsage(firstBuild && firstBuild.usage);
+      if (firstBuild && firstBuild.toolCalls && firstBuild.toolCalls.length) {
+        await execToolCalls(firstBuild, cur, messages);
+        built = SPEC.scenes.length > 0;
+        cur.body.textContent = built
+          ? 'Created ' + SPEC.scenes.length + ' scene' + (SPEC.scenes.length === 1 ? '' : 's') + ' · ' + DUR.toFixed(1) + 's.'
+          : 'The model returned a spec, but the editor did not create any scenes. Check the replace_spec tool result.';
+      } else {
+        cur.body.textContent = window.__LAST_TOOL_CALL_DIAGNOSTIC || 'The provider did not return a valid video spec.';
+      }
+      if (!built) {
+        finalText = cur.body.textContent;
+        buildFailedBeforeLoop = true;
+      }
+    }
+
+    for (let step = buildHandledBeforeLoop ? 1 : 0; !buildFailedBeforeLoop && step < SAFE_CAP; step++) {
       if (step) cur = beginStep(bubble);
       window.STEP_NOTE = '';
       $('stepInfo').textContent = 'step ' + (step + 1) + (tools ? '' : ' · tools off');
@@ -141,26 +166,6 @@ async function runAgent(userText) {
         break;
       }
 
-      /* Recover a new-video request through required tools and JSON output modes. */
-      if (newVideoBuild && !built && tools) {
-        cur = beginStep(bubble);
-        cur.body.textContent = 'Building the video…';
-        $('stepInfo').textContent = 'building video · recovering tool call';
-        const forced = await buildVideoWithRecovery(messages, tools, render, ABORT.signal, userText);
-        addUsage(forced && forced.usage);
-        if (forced && forced.toolCalls && forced.toolCalls.length) {
-          await execToolCalls(forced, cur, messages);
-          built = SPEC.scenes.length > 0;
-          cur.body.textContent = built
-            ? 'Built ' + SPEC.scenes.length + ' scene' + (SPEC.scenes.length === 1 ? '' : 's') + ' · ' + DUR.toFixed(1) + 's.'
-            : 'The video spec was received, but the editor could not create any scenes. Check the tool result above.';
-        } else {
-          cur.body.textContent = window.__LAST_TOOL_CALL_DIAGNOSTIC || 'The provider did not return a valid video spec.';
-        }
-        finalText = built ? '' : cur.body.textContent;
-        if (!built) break;
-        continue;
-      }
       break;
     }
 
