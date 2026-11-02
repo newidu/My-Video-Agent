@@ -33,7 +33,7 @@ if (duplicateIds.length) throw new Error('Duplicate UI element IDs: ' + duplicat
 for (const id of ['settingsView','btnCloseSettings','btnOpenSettings','providerPreset','apiKey','baseUrl','model','skillBox','toolSettingsList','musicBox','settingDefaultFormat','settingExportBitrate','manualModel','btnFontSettings']) {
  if (!settingsHtmlIds.includes(id)) throw new Error('Settings UI is missing required element: ' + id);
 }
-const legacyControls = html.match(/<div id="legacyEditorControls" hidden>([\\s\\S]*?)<\\/div>/);
+const legacyControls = html.match(/<div id="legacyEditorControls" hidden>([\s\S]*?)<\/div>/);
 if (!legacyControls) throw new Error('Legacy engine controls must stay hidden outside the Settings UI.');
 for (const id of ['formatSel','btnLetter','btnMusicOn','btnFont']) {
  if (!legacyControls[1].includes('id="' + id + '"')) throw new Error('Editor preference control must be hidden and managed in Settings: ' + id);
