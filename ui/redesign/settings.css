@@ -302,3 +302,32 @@ body[data-theme="graphite"] .msg.bot { background:#222d37; border-color:#3d4a56;
 body[data-theme="graphite"] .msg.user { background:#293949; border-color:#435a6c; color:#e4eef6; }
 body[data-theme="graphite"] .sidebar-current { background:#263747; border-color:#40576a; }
 body[data-theme="graphite"] #stageWrap { background:radial-gradient(ellipse at 50% 47%,#263543 0%,#1a222b 62%,#141a21 100%); }
+
+/* Explicitly honour the hidden attribute. Component display rules must not override
+   the screen switch used by the Settings <-> Editor navigation. */
+.settings-view[hidden],
+.mainShell[hidden],
+#legacyEditorControls[hidden] { display:none !important; }
+body.settings-open > .app > .topbar { display:none !important; }
+body.settings-open > .app > .settings-view:not([hidden]) { height:100vh; min-height:100vh; }
+body.settings-open { overflow:hidden; }
+
+/* The editor owns editing actions; preferences are available only in Settings. */
+.topbar-controls #legacyEditorControls { display:none !important; }
+.topbar .topbar-context { min-width:190px; }
+.topbar .topbar-controls { gap:7px; }
+.topbar .topbar-controls .play-button { min-width:82px; }
+.topbar .topbar-controls .export-button { min-width:92px; }
+.topbar .topbar-feedback { margin-left:auto; }
+.projectSidebar .tools-section { margin-top:3px; }
+.projectSidebar .quick-tools { gap:4px; }
+.composer { gap:6px; }
+.composer textarea { min-height:106px; }
+.settings-header { min-height:64px; }
+.settings-page-heading { margin-bottom:18px; }
+.settings-page-heading h1 { margin-bottom:0; }
+.settings-card { padding:16px 18px; }
+.settings-nav-footer { display:none; }
+#musicBox { padding:0; border:0; box-shadow:none; }
+#musicBox h4:first-child { margin-top:0; }
+.settings-content .settings-skill-box { margin-top:8px; }

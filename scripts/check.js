@@ -30,8 +30,18 @@ if ((cssText.match(/\{/g) || []).length !== (cssText.match(/\}/g) || []).length)
 const settingsHtmlIds = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map(m => m[1]);
 const duplicateIds = [...new Set(settingsHtmlIds.filter((id, i) => settingsHtmlIds.indexOf(id) !== i))];
 if (duplicateIds.length) throw new Error('Duplicate UI element IDs: ' + duplicateIds.join(', '));
-for (const id of ['settingsView','providerPreset','apiKey','baseUrl','model','skillBox','toolSettingsList','musicBox','settingDefaultFormat','settingExportBitrate','manualModel']) {
+for (const id of ['settingsView','btnCloseSettings','btnOpenSettings','providerPreset','apiKey','baseUrl','model','skillBox','toolSettingsList','musicBox','settingDefaultFormat','settingExportBitrate','manualModel','btnFontSettings']) {
  if (!settingsHtmlIds.includes(id)) throw new Error('Settings UI is missing required element: ' + id);
+}
+const legacyControls = html.match(/<div id="legacyEditorControls" hidden>([\s\S]*?)<\/div>/);
+if (!legacyControls) throw new Error('Legacy engine controls must stay hidden outside the Settings UI.');
+for (const id of ['formatSel','btnLetter','btnMusicOn','btnFont']) {
+ if (!legacyControls[1].includes('id="' + id + '"')) throw new Error('Editor preference control must be hidden and managed in Settings: ' + id);
+}
+if (html.includes('id="btnOpenSkills"') || html.includes('id="btnMusic"')) throw new Error('A Settings-only shortcut is still visible in the editor.');
+const settingsCssText = fs.readFileSync(settingsCss,'utf8');
+for (const rule of ['.settings-view[hidden]','.mainShell[hidden]','body.settings-open > .app > .topbar']) {
+ if (!settingsCssText.includes(rule)) throw new Error('Settings/Editor navigation rule missing: ' + rule);
 }
 const source = fs.readFileSync(path.join(root, 'original', 'source.html'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'skills', 'manifest.json'), 'utf8'));

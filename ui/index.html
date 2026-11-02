@@ -16,29 +16,27 @@
       <span class="topbar-mark" aria-hidden="true">✳</span>
       <div class="topbar-product">
         <strong>My Video Agent</strong>
-        <span>WORKSPACE</span>
       </div>
-      <span class="crumb-separator">/</span>
-      <span class="crumb-current">Untitled project</span>
-      <span class="local-pill"><span></span> Local</span>
     </div>
 
     <div class="topbar-controls">
-      <select id="formatSel" title="Video format" aria-label="Video format">
-        <option value="9:16">9:16 · Portrait</option>
-        <option value="16:9">16:9 · Landscape</option>
-        <option value="1:1">1:1 · Square</option>
-      </select>
-      <span class="toolbar-divider"></span>
-      <button id="btnUndo" class="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button>
-      <button id="btnRedo" class="icon-button" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button>
+      <button id="btnUndo" class="icon-button" title="Undo" aria-label="Undo">↶</button>
+      <button id="btnRedo" class="icon-button" title="Redo" aria-label="Redo">↷</button>
       <span class="toolbar-divider"></span>
       <button id="btnPlay" class="primary play-button">▶ <span>Preview</span></button>
-      <button id="btnRestart" class="subtle-button" title="Restart preview">↺</button>
-      <button id="btnLetter" class="subtle-button">Aa <span>Letters: ON</span></button>
-      <button id="btnMusicOn" class="subtle-button">♫ <span>Music ON</span></button>
+      <button id="btnRestart" class="subtle-button" title="Restart">↺</button>
       <span class="toolbar-divider"></span>
-      <button id="btnExport" class="primary export-button">Export video <span>↗</span></button>
+      <button id="btnExport" class="primary export-button">Export <span>↗</span></button>
+      <div id="legacyEditorControls" hidden>
+        <select id="formatSel" title="Video format" aria-label="Video format">
+          <option value="9:16">9:16 · Portrait</option>
+          <option value="16:9">16:9 · Landscape</option>
+          <option value="1:1">1:1 · Square</option>
+        </select>
+        <button id="btnLetter" type="button">Letters: ON</button>
+        <button id="btnMusicOn" type="button">Music</button>
+        <button id="btnFont" type="button">Fonts</button>
+      </div>
     </div>
 
     <div class="topbar-feedback">
@@ -53,8 +51,8 @@
 
   <section id="settingsView" class="settings-view" hidden aria-label="Application settings">
     <div class="settings-header">
-      <div class="settings-header-title"><span class="settings-header-icon">⚙</span><div><strong>Settings</strong><small>Configure your creative workspace</small></div></div>
-      <div class="settings-header-actions"><span class="settings-profile-label">MY VIDEO AGENT</span><button id="btnCloseSettings" class="settings-close-button" title="Back to editor">← <span>Back to editor</span></button></div>
+      <div class="settings-header-title"><span class="settings-header-icon">⚙</span><div><strong>Settings</strong></div></div>
+      <div class="settings-header-actions"><button id="btnCloseSettings" class="settings-close-button" type="button" title="Back to editor">← Back to editor</button></div>
     </div>
     <div class="settings-layout">
       <nav class="settings-nav" aria-label="Settings sections">
@@ -71,23 +69,18 @@
         <button class="settings-nav-item" data-settings-target="audio"><span>♫</span> Audio &amp; music</button>
         <div class="settings-nav-caption settings-nav-spaced">SYSTEM</div>
         <button class="settings-nav-item" data-settings-target="advanced"><span>⌘</span> Advanced</button>
-        <div class="settings-nav-footer"><span class="settings-online-dot"></span><span>Settings stored on this device</span></div>
+        
       </nav>
       <div class="settings-content" role="main">
         <section class="settings-panel active" data-settings-panel="general">
-          <div class="settings-page-heading"><span class="settings-kicker">PREFERENCES</span><h1>General</h1><p>Manage how My Video Agent opens and remembers your workspace.</p></div>
+          <div class="settings-page-heading"><h1>General</h1></div>
           <section class="settings-card">
             <div class="settings-card-heading"><div><span class="settings-kicker">STARTUP</span><h3>Startup experience</h3></div></div>
-            <div class="setting-row"><div><label for="settingStartupView">Open app to</label><p>Choose which workspace is shown when the app starts.</p></div><select id="settingStartupView"><option value="editor">Video editor</option><option value="settings">Settings</option></select></div>
+            <div class="setting-row"><div><label for="settingStartupView">Open app to</label></div><select id="settingStartupView"><option value="editor">Video editor</option><option value="settings">Settings</option></select></div>
           </section>
-          <section class="settings-card">
-            <div class="settings-card-heading"><div><span class="settings-kicker">WORKSPACE</span><h3>Project defaults</h3></div></div>
-            <div class="setting-row"><div><label>Default video format</label><p>Choose your preferred aspect ratio in Video editor settings.</p></div><button class="settings-secondary-button" data-open-settings="editor">Configure editor</button></div>
-            <div class="setting-row"><div><label>Provider and model</label><p>Connect a model provider and manage saved model profiles.</p></div><button class="settings-secondary-button" data-open-settings="providers">Manage providers</button></div>
-            <div class="setting-row"><div><label>Skills and agent tools</label><p>Control which capabilities and workflow instructions are available to the agent.</p></div><button class="settings-secondary-button" data-open-settings="skills">Manage skills</button></div>
-          </section>
+
         </section>
-        <section class="settings-panel" data-settings-panel="appearance"><div class="settings-page-heading"><span class="settings-kicker">PREFERENCES</span><h1>Appearance</h1><p>Choose the visual style for the editor and agent workspace.</p></div>
+        <section class="settings-panel" data-settings-panel="appearance"><div class="settings-page-heading"><h1>Appearance</h1></div>
         <section class="settings-card">
           <div class="settings-card-heading"><div><span class="settings-kicker">VISUAL THEME</span><h3>Appearance</h3></div></div>
           <div class="theme-options">
@@ -96,7 +89,7 @@
             <label class="theme-choice"><input type="radio" name="settingTheme" value="light"><span class="theme-swatch theme-light"><i></i><i></i><i></i></span><b>Light</b><small>Bright editing workspace</small></label>
           </div>
         </section></section>
-        <section class="settings-panel" data-settings-panel="editor"><div class="settings-page-heading"><span class="settings-kicker">CREATIVE WORKSPACE</span><h1>Video editor</h1><p>Set your canvas defaults and editing preferences.</p></div>
+        <section class="settings-panel" data-settings-panel="editor"><div class="settings-page-heading"><h1>Video editor</h1></div>
         <section class="settings-card">
           <div class="settings-card-heading"><div><span class="settings-kicker">CANVAS</span><h3>Video editor defaults</h3></div><span class="settings-icon">▧</span></div>
           <div class="settings-fields">
@@ -107,7 +100,7 @@
                 <option value="16:9">16:9 · Landscape / YouTube</option>
                 <option value="1:1">1:1 · Square</option>
               </select>
-              <small class="settings-help">Used as your preferred starting format. Apply it to the open project with the button below.</small>
+              <small class="settings-help">Choose the format used when a new project opens.</small>
             </div>
             <div class="settings-button-row"><button id="btnApplyDefaultFormat" class="settings-secondary-button">Apply to current project</button></div>
             <div class="setting-row">
@@ -115,29 +108,27 @@
               <input type="checkbox" id="settingLetterMode">
             </div>
             <div class="setting-row">
-              <div><label for="settingShowBeatGrid">Show beat grid when music is active</label><p>Display the music beat markers on the timeline.</p></div>
+              <div><label for="settingShowBeatGrid">Show beat grid when music is active</label></div>
               <input type="checkbox" id="settingShowBeatGrid">
             </div>
             <div class="setting-row">
-              <div><label for="settingExportBitrate">Video export quality</label><p>Controls the encoded video bitrate. Higher bitrates create larger files.</p></div>
+              <div><label for="settingExportBitrate">Video export quality</label></div>
               <select id="settingExportBitrate"><option value="4000000">Standard · 4 Mbps</option><option value="9000000">High · 9 Mbps</option><option value="16000000">Ultra · 16 Mbps</option></select>
             </div>
           </div>
         </section>
         <section class="settings-card">
-          <div class="settings-card-heading"><div><span class="settings-kicker">EDITING WORKFLOW</span><h3>Available editor tools</h3></div></div>
-          <div class="settings-feature-list">
-            <div><b>Canvas editing</b><span>Select, drag, edit and remove text, shapes and drawn elements.</span></div>
-            <div><b>Scenes and timeline</b><span>Scene selection, playback, scrubbing, undo/redo and project save/load.</span></div>
-            <div><b>Cut and erase</b><span>Area selection, crop, cut-out and destructive erase operations.</span></div>
-            <div><b>Typography</b><span>Upload custom TTF/OTF/WOFF fonts and edit text styles.</span></div>
-            <div><b>Export</b><span>Render the current composition to a video file or export a poster image.</span></div>
+          <div class="settings-card-heading"><div><span class="settings-kicker">TYPOGRAPHY</span><h3>Custom fonts</h3></div></div>
+          <div class="setting-row">
+            <div><label>Font library</label><p>Add a TTF, OTF or WOFF font for text elements in this project.</p></div>
+            <button id="btnFontSettings" class="settings-secondary-button" type="button">Add font</button>
           </div>
-        </section></section>
-        <section class="settings-panel" data-settings-panel="providers"><div class="settings-page-heading"><span class="settings-kicker">AI CONNECTIONS</span><h1>Providers &amp; models</h1><p>Manage model endpoints, credentials and active models.</p></div>
+        </section>
+</section>
+        <section class="settings-panel" data-settings-panel="providers"><div class="settings-page-heading"><h1>Providers &amp; models</h1></div>
         <div class="settings-callout">
           <span class="callout-icon">⌘</span>
-          <div><strong>One agent · multiple model providers</strong><p>Connect an OpenAI-compatible API, choose a model, and switch profiles without replacing your video editor. Each provider keeps its own endpoint, model and saved key.</p></div>
+          <div><strong>One agent · multiple model providers</strong><p>Each provider has its own API key, endpoint and model profile.</p></div>
         </div>
         <section class="settings-card">
           <div class="settings-card-heading">
@@ -230,10 +221,9 @@
             <p>This build connects text/agent models only. It does not yet have configurable third-party video generation, image generation, transcription or text-to-speech API adapters. Video compositions are rendered by the built-in canvas editor; music and beat synthesis use the existing local audio engine.</p>
           </div>
         </section></section>
-        <section class="settings-panel" data-settings-panel="skills"><div class="settings-page-heading"><span class="settings-kicker">AGENT KNOWLEDGE</span><h1>Skills</h1><p>Manage the instruction library used by the video agent.</p></div>
+        <section class="settings-panel" data-settings-panel="skills"><div class="settings-page-heading"><h1>Skills</h1></div>
         <section class="settings-card">
           <div class="settings-card-heading"><div><span class="settings-kicker">AGENT KNOWLEDGE</span><h3>Skills library</h3></div><span class="settings-icon">◇</span></div>
-          <p class="settings-copy">Choose which bundled instruction files the agent can use. Skills stay local to this app and can be enabled or disabled without deleting the originals.</p>
           <input id="skillSearch" class="settings-wide-input" type="search" placeholder="Filter skills by name…" autocomplete="off">
                 <details class="skillBox settings-skill-box" id="skillBox" open>
         <summary><span>◇</span> Skill pack <span id="skillCount" class="muted skill-count"></span></summary>
@@ -245,7 +235,7 @@
         </div>
       </details>
         </section></section>
-        <section class="settings-panel" data-settings-panel="agent"><div class="settings-page-heading"><span class="settings-kicker">AGENT BEHAVIOUR</span><h1>Agent</h1><p>Configure planning, reasoning and how the agent interacts with the editor.</p></div>
+        <section class="settings-panel" data-settings-panel="agent"><div class="settings-page-heading"><h1>Agent</h1></div>
         <section class="settings-card">
           <div class="settings-card-heading">
             <div><span class="settings-kicker">MODEL BEHAVIOUR</span><h3>Agent configuration</h3></div>
@@ -253,40 +243,32 @@
           </div>
           <div class="settings-fields">
             <div class="setting-row setting-row-stacked">
-              <div><label for="thinking">Thinking mode</label><p>DeepSeek extended thinking. Other compatible providers use their standard request format.</p></div>
+              <div><label for="thinking">Thinking mode</label></div>
               <select id="thinking" title="Thinking mode">
                 <option value="auto">Auto</option><option value="on">On</option><option value="off">Off</option>
               </select>
             </div>
             <div class="setting-row">
-              <div><label for="modelRoute">Route routine steps to DeepSeek Flash</label><p>Use Flash for mechanical tool steps when DeepSeek is the active provider.</p></div>
+              <div><label for="modelRoute">Route routine steps to DeepSeek Flash</label></div>
               <input type="checkbox" id="modelRoute" checked>
             </div>
             <div class="setting-row">
-              <div><label for="useTools">Agent tools and action loop</label><p>Allow the agent to edit scenes, manipulate elements, inspect frames and export video.</p></div>
+              <div><label for="useTools">Agent tools and action loop</label></div>
               <input type="checkbox" id="useTools" checked>
             </div>
             <p class="settings-inline-status" id="stepInfo"></p>
           </div>
         </section>
-        <section class="settings-card">
-          <div class="settings-card-heading">
-            <div><span class="settings-kicker">SESSION</span><h3>Conversation controls</h3></div>
-          </div>
-          <p class="settings-copy">Compact the current conversation to keep decisions and remove unnecessary raw tool output. Clearing the chat does not delete your video project.</p>
-          <p class="settings-copy">Use the compact control in the agent chat header to summarise the current session, or use New conversation in the workspace sidebar to clear the chat.</p>
-        </section></section>
-        <section class="settings-panel" data-settings-panel="tools"><div class="settings-page-heading"><span class="settings-kicker">CAPABILITIES</span><h1>Tools</h1><p>Enable optional video editing, inspection and workflow tools.</p></div>
+        </section>
+        <section class="settings-panel" data-settings-panel="tools"><div class="settings-page-heading"><h1>Tools</h1></div>
         <section class="settings-card">
           <div class="settings-card-heading"><div><span class="settings-kicker">TOOL ACCESS</span><h3>Agent tool library</h3></div></div>
-          <p class="settings-copy">Core safety, project-editing and recovery tools remain enabled. Optional tools can be activated here; the agent discovers enabled tools when needed.</p>
+          <p class="settings-copy">Optional tools can be enabled below. Core editing and recovery tools stay on.</p>
           <div id="toolSettingsList" class="tool-settings-list"><div class="settings-loading">Loading available tools…</div></div>
           <div class="settings-button-row"><button id="btnResetTools" class="settings-secondary-button">Reset optional tools</button></div>
         </section></section>
-        <section class="settings-panel" data-settings-panel="audio"><div class="settings-page-heading"><span class="settings-kicker">MEDIA WORKSPACE</span><h1>Audio &amp; music</h1><p>Configure music, beat timing and sound effects for the active video.</p></div>
+        <section class="settings-panel" data-settings-panel="audio"><div class="settings-page-heading"><h1>Audio &amp; music</h1></div>
         <section class="settings-card">
-          <div class="settings-card-heading"><div><span class="settings-kicker">SOUND & MUSIC</span><h3>Audio workspace</h3></div><span class="settings-icon">♫</span></div>
-          <p class="settings-copy">These are the same live music, beat and sound-effect controls used by the video editor. Changes are applied directly to the current project.</p>
                   <div id="musicBox">
           <h4>♫ Music &amp; beat</h4>
           <div class="mrow musicOnly"><span>Track</span><b id="musName">none</b>
@@ -313,7 +295,7 @@
           <p class="muted2" id="musInfo">No track yet — add a music file, or let the agent make one. Beats drive beat-synced animation.</p>
         </div>
         </section></section>
-        <section class="settings-panel" data-settings-panel="advanced"><div class="settings-page-heading"><span class="settings-kicker">SYSTEM</span><h1>Advanced</h1><p>Manage local data, privacy and keyboard shortcuts.</p></div>
+        <section class="settings-panel" data-settings-panel="advanced"><div class="settings-page-heading"><h1>Advanced</h1></div>
         <section class="settings-card">
           <div class="settings-card-heading"><div><span class="settings-kicker">LOCAL DATA</span><h3>Privacy and storage</h3></div></div>
           <div class="settings-warning"><b>API key storage</b><p>Remembered keys are stored in this browser's localStorage. Anyone with access to this browser profile may be able to inspect them. For shared or production use, use a secure desktop credential store or a backend proxy.</p></div>
@@ -360,21 +342,17 @@
           <span>Video editor</span>
           <span class="current-indicator"></span>
         </div>
-        <button id="btnOpenSkills" class="sidebar-nav">
-          <span class="nav-symbol">◇</span><span>Skills library</span>
-        </button>
         <button id="btnOpenSettings" class="sidebar-nav">
           <span class="nav-symbol">⚙</span><span>Settings</span>
         </button>
       </div>
 
       <div class="sidebar-section project-section">
-        <div class="sidebar-label">CURRENT PROJECT <span class="label-dot"></span></div>
+        <div class="sidebar-label">PROJECT</div>
         <div class="project-tile">
           <div class="project-file-icon">▣</div>
           <div class="project-file-copy">
             <strong>Untitled project</strong>
-            <small>Video workspace</small>
           </div>
         </div>
         <div class="project-actions">
@@ -384,27 +362,22 @@
       </div>
 
       <div class="sidebar-section tools-section">
-        <div class="sidebar-label">QUICK TOOLS</div>
+        <div class="sidebar-label">TOOLS</div>
         <div class="quick-tools">
           <button id="btnCrop" class="quick-tool"><span class="quick-tool-icon">⌗</span><span>Cut / erase</span></button>
-          <button id="btnMusic" class="quick-tool"><span class="quick-tool-icon">♫</span><span>Music &amp; beats</span></button>
-          <button id="btnFont" class="quick-tool"><span class="quick-tool-icon">Aa</span><span>Fonts</span></button>
-          <button id="btnPoster" class="quick-tool"><span class="quick-tool-icon">▧</span><span>Poster</span></button>
+            <button id="btnPoster" class="quick-tool"><span class="quick-tool-icon">▧</span><span>Poster</span></button>
         </div>
       </div>
 
       <div class="sidebar-bottom">
-        <div class="sidebar-status"><span class="status-led"></span><span>Workspace ready</span></div>
         <button id="btnReset" class="reset-button"><span>↻</span> Reset workspace</button>
-        <div class="sidebar-version"><span class="mini-avatar">V</span><span>Video Agent</span><span class="version-tag">DESKTOP</span></div>
       </div>
     </aside>
 
     <aside id="agentPane">
       <div class="paneHead agent-pane-head">
         <div class="agent-heading">
-          <span class="agent-eyebrow">AI ASSISTANT</span>
-          <strong>Video agent</strong>
+                    <strong>Video agent</strong>
         </div>
         <div class="agent-head-actions">
           <span id="usage" class="usage" title="Tokens used this session">— tok</span>
@@ -416,18 +389,15 @@
 
 
 
-      <div class="conversation-label"><span>Conversation</span><span class="conversation-hint">Your creative partner</span></div>
-      <div id="chat" aria-live="polite"></div>
+            <div id="chat" aria-live="polite"></div>
 
       <div class="composer-shell">
         <div class="composer">
-          <div class="composer-label"><span class="composer-pulse"></span> MESSAGE YOUR AGENT</div>
-          <textarea id="prompt" placeholder="Describe the video you want to create or the edit you need…&#10;&#10;Try: Make this a 15-second vertical promo with bold captions."></textarea>
+          <textarea id="prompt" placeholder="Describe a video or an edit…"></textarea>
           <div class="composer-toolbar">
             <label class="attach-video" title="Add a source video">＋ <span>Video</span>
               <input id="fileVideo" type="file" accept="video/*" hidden>
             </label>
-            <span class="composer-shortcut">Enter to send</span>
             <button id="btnStop" class="stop-button">Stop</button>
             <button id="btnSend" class="primary send-button">Run agent <span>↑</span></button>
           </div>
@@ -438,16 +408,13 @@
 
     <section class="editorWorkspace" aria-label="Video editing workspace">
       <section class="center">
-        <div class="preview-toolbar">
-          <div class="preview-heading"><span class="preview-live-dot"></span><span class="preview-label">PREVIEW</span><strong>Canvas</strong></div>
-          <span class="preview-context">Live composition</span>
-        </div>
+        <div class="preview-toolbar"><strong>Preview</strong></div>
         <div id="stageWrap">
           <div class="stageInner" id="stageInner">
             <canvas id="stage" width="1080" height="1920"></canvas>
             <canvas id="overlay" width="1080" height="1920"></canvas>
             <div class="cropPick" id="cropPick">
-              <p>This area — what now?<br><span>Elements under the box are removed for the whole clip.</span></p>
+              <p>Choose an action</p>
               <button id="cpCut" class="primary">✂ Cut out &amp; move it</button>
               <button id="cpErase">Erase it (remove for real)</button>
               <button id="cpCancel" class="ghost">Cancel</button>
@@ -464,8 +431,7 @@
 
       <aside id="editPane">
         <div class="inspector-header">
-          <div><span class="inspector-eyebrow">WORKSPACE</span><strong>Inspector</strong></div>
-          <span class="inspector-menu">···</span>
+          <strong>Inspector</strong>
         </div>
         <section class="inspector-section">
           <h3>Selected element</h3>
@@ -476,21 +442,14 @@
           <div id="sceneList"></div>
         </section>
         <section class="inspector-section">
-          <h3>Elements on this frame <span>· click to select</span></h3>
+          <h3>Elements</h3>
           <div id="elList"></div>
         </section>
         <section class="inspector-section">
-          <h3>Your edits</h3>
+          <h3>Changes</h3>
           <div id="itemList"></div>
         </section>
-        <div id="help">
-          <strong>Quick tips</strong>
-          <p>Click any text, shape or icon on the video to select it. Drag to move, press <kbd>Del</kbd> to remove.</p>
-          <p>Letters ON lets you select a single letter. Double-click to select a whole word.</p>
-          <p>Use Cut / erase to select an area, then cut it out or remove it.</p>
-          <p><kbd>Space</kbd> play · <kbd>Esc</kbd> deselect · Arrow keys nudge · <kbd>Shift</kbd> for larger steps.</p>
-        </div>
-      </aside>
+     </aside>
     </section>
   </main>
 
