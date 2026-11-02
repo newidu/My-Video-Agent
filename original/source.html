@@ -4044,133 +4044,147 @@ async function streamChat(messages, tools, onState, signal, toolChoice, requestO
   requestOptions = requestOptions || {};
   const picked = $('model').value;
   const model = (window.MODEL_OVERRIDE && $('modelRoute') && $('modelRoute').checked) ? window.MODEL_OVERRIDE : picked;
-  const body = { model: requestOptions.model || model, messages, stream: true, stream_options: { include_usage: true }, temperature: requestOptions.temperature === undefined ? 0.6 : requestOptions.temperature, max_tokens: requestOptions.maxTokens || 6000 };
+  const body = {
+    model: requestOptions.model || model, messages, stream: true,
+    stream_options: { include_usage: true },
+    temperature: requestOptions.temperature === undefined ? 0.6 : requestOptions.temperature,
+    max_tokens: requestOptions.maxTokens || 6000
+  };
   if (requestOptions.responseFormat) body.response_format = requestOptions.responseFormat;
   const forced = !!(toolChoice && toolChoice !== 'auto');
   if (tools && tools.length) { body.tools = tools; body.tool_choice = toolChoice || 'auto'; }
-  /* keep the answer short: a step that only calls tools does not need an essay */
-  if (!body.max_tokens) body.max_tokens = 2400;
-  const think = requestOptions.thinking || window.THINK_OVERRIDE || $('thinking').value;
+
+  // Explicit request/agent overrides always beat the composer preference.
+  let think = requestOptions.thinking || window.THINK_OVERRIDE;
+  if (!think && typeof window.AIVA_COMPOSER_THINKING === 'function') think = window.AIVA_COMPOSER_THINKING() ? 'on' : 'off';
+  if (!think) think = $('thinking').value;
   if (think === 'on') body.thinking = { type: 'enabled' };
-  if (think === 'off') body.thinking = { type: 'disabled' };
-  /* auto-heal: once a model has refused thinking once, stop asking it for the rest of the run */
+  else if (think === 'off') body.thinking = { type: 'disabled' };
   window.THINK_BLOCKED = window.THINK_BLOCKED || {};
   if (body.thinking && body.thinking.type === 'enabled' && window.THINK_BLOCKED[model]) body.thinking = { type: 'disabled' };
-  /* a forced tool_choice and a thinking model are mutually exclusive on this API
-     ("Thinking mode does not support this tool_choice"): the forced call wins */
   if (forced && body.thinking && body.thinking.type === 'enabled') body.thinking = { type: 'disabled' };
 
-  const post = b => fetch(apiBase() + '/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey() },
-    body: JSON.stringify(b),
-    signal
+  const post = requestBody => fetch(apiBase() + '/chat/completions', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey() },
+    body: JSON.stringify(requestBody), signal
   });
   let res = await post(body);
   if (!res.ok) {
     let txt = await res.text();
-    /* defensive: whatever combination the server refuses, degrade instead of failing
-       1) thinking + tool_choice → drop thinking   2) still refused → relax tool_choice */
-    /* any 400 that mentions thinking: the model either cannot think with tools,
-       or cannot think with a forced call — drop thinking and go again */
-    const clash = /think/i.test(txt);
-    if (res.status === 400 && clash) {
+    if (res.status === 400 && /think|tool_choice|function call/i.test(txt)) {
       window.THINK_BLOCKED[model] = true;
-      agentStatus(model + ' refuses thinking here — running it with thinking off.');
+      agentStatus(model + ' rejected the thinking/tool-choice combination — retrying explicitly with Thinking OFF.');
+      // DeepSeek enables thinking by default when this property is omitted.
       const b2 = JSON.parse(JSON.stringify(body));
-      delete b2.thinking;
+      b2.thinking = { type: 'disabled' };
       res = await post(b2);
-      if (res.ok) { window.STEP_NOTE = 'thinking off (the API refuses thinking + a forced tool call)'; }
+      if (res.ok) window.STEP_NOTE = 'Thinking explicitly disabled for this tool call';
       else {
         txt = await res.text();
         const b3 = JSON.parse(JSON.stringify(body));
-        delete b3.thinking; b3.tool_choice = 'auto';
+        b3.thinking = { type: 'disabled' };
+        b3.tool_choice = 'auto';
         res = await post(b3);
-        if (res.ok) { window.STEP_NOTE = 'tool_choice relaxed to auto (the API refuses thinking + a forced tool call)'; }
+        if (res.ok) window.STEP_NOTE = 'Thinking OFF; tool choice relaxed to auto';
         else txt = await res.text();
       }
     }
     if (!res.ok) {
-      const hint = /tool_choice/i.test(txt) ? ' — this model cannot combine thinking with a forced tool call; the page already disables thinking for forced calls, so switch think: auto or think: off for this run' : '';
-      throw new Error('API ' + res.status + ': ' + redact(txt.slice(0, 300)) + hint);
+      const error = new Error('API ' + res.status + ': ' + redact(txt.slice(0, 700)));
+      error.status = res.status;
+      error.retryableToolMode = /tool_choice|function call|tool calling/i.test(txt);
+      throw error;
     }
   }
-  const acc = { content: '', reasoning: '', toolCalls: [], usage: null, finishReason: '', refusal: '' };
-  if (!res.body) {                                  // no streaming -> plain JSON
-    const j = JSON.parse(await res.text());
-    const m = j.choices[0].message;
-    acc.content = typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map(p => p && (p.text || '')).join('\\n') : '';
-    acc.reasoning = m.reasoning_content || m.reasoning || '';
-    acc.refusal = m.refusal || '';
-    acc.toolCalls = m.tool_calls || [];
-    acc.finishReason = j.choices[0].finish_reason || '';
-    acc.usage = j.usage;
+
+  const acc = { content: '', reasoning: '', toolCalls: [], usage: null, finishReason: '', refusal: '', responseId: '', responseModel: '', chunks: 0, receivedDone: false };
+  const textFrom = value => {
+    if (typeof value === 'string') return value;
+    if (Array.isArray(value)) return value.map(part => typeof part === 'string' ? part : (part && (part.text || part.content || '') || '')).join('');
+    return '';
+  };
+  const mergeToolCalls = calls => {
+    if (!Array.isArray(calls)) return;
+    calls.forEach((tc, k) => {
+      const index = tc.index === undefined ? k : tc.index;
+      let slot = acc.toolCalls[index];
+      if (!slot) slot = acc.toolCalls[index] = { id: '', type: 'function', function: { name: '', arguments: '' } };
+      if (tc.id) slot.id = tc.id;
+      if (tc.type) slot.type = tc.type;
+      if (tc.function) {
+        if (tc.function.name) slot.function.name += tc.function.name;
+        if (tc.function.arguments) slot.function.arguments += tc.function.arguments;
+      }
+    });
+  };
+  const consumePayload = payload => {
+    if (!payload || payload === '[DONE]') { if (payload === '[DONE]') acc.receivedDone = true; return; }
+    let event;
+    try { event = JSON.parse(payload); }
+    catch (error) { acc.parseWarnings = (acc.parseWarnings || 0) + 1; return; }
+    if (event.error) {
+      const detail = typeof event.error === 'string' ? event.error : JSON.stringify(event.error);
+      throw new Error('API stream error: ' + redact(detail.slice(0, 700)));
+    }
+    if (event.id) acc.responseId = event.id;
+    if (event.model) acc.responseModel = event.model;
+    if (event.usage) acc.usage = event.usage;
+    const choice = event.choices && event.choices[0];
+    if (!choice) { onState(acc); return; }
+    const delta = choice.delta || choice.message || {};
+    const reasoning = delta.reasoning_content !== undefined ? delta.reasoning_content : delta.reasoning;
+    if (reasoning) acc.reasoning += textFrom(reasoning);
+    if (delta.content !== undefined && delta.content !== null) acc.content += textFrom(delta.content);
+    if (delta.refusal) acc.refusal += textFrom(delta.refusal);
+    if (choice.finish_reason) acc.finishReason = choice.finish_reason;
+    mergeToolCalls(delta.tool_calls);
+    acc.chunks += 1;
+    onState(acc);
+  };
+
+  if (!res.body) {
+    const data = await res.json();
+    if (data.error) throw new Error('API response error: ' + redact(JSON.stringify(data.error).slice(0, 700)));
+    const choice = data.choices && data.choices[0];
+    if (!choice || !choice.message) throw new Error('The API response did not contain choices[0].message.');
+    const message = choice.message;
+    acc.content = textFrom(message.content);
+    acc.reasoning = textFrom(message.reasoning_content || message.reasoning);
+    acc.refusal = textFrom(message.refusal);
+    acc.toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
+    acc.finishReason = choice.finish_reason || '';
+    acc.usage = data.usage || null;
+    acc.responseId = data.id || '';
+    acc.responseModel = data.model || '';
     onState(acc);
     return acc;
   }
+
   const reader = res.body.getReader();
-  const dec = new TextDecoder();
-  let buf = '';
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    let nl;
-    while ((nl = buf.indexOf('\n')) >= 0) {
-      const line = buf.slice(0, nl).trim();
-      buf = buf.slice(nl + 1);
-      if (!line.startsWith('data:')) continue;
-      const payload = line.slice(5).trim();
-      if (!payload || payload === '[DONE]') continue;
-      let j;
-      try { j = JSON.parse(payload); } catch (e) { continue; }
-      if (j.usage) { acc.usage = j.usage; onState(acc); }
-      const ch = j.choices && j.choices[0];
-      if (!ch) continue;
-      const d = ch.delta || ch.message || {};
-      if (d.reasoning_content || d.reasoning) acc.reasoning += d.reasoning_content || d.reasoning;
-      if (d.content !== undefined) acc.content += typeof d.content === 'string' ? d.content : Array.isArray(d.content) ? d.content.map(p => p && (p.text || '')).join('\\n') : '';
-      if (d.refusal) acc.refusal += d.refusal;
-      if (ch.finish_reason) acc.finishReason = ch.finish_reason;
-      if (d.tool_calls) {
-        d.tool_calls.forEach((tc, k) => {
-          const idx = (tc.index === undefined) ? k : tc.index;
-          let slot = acc.toolCalls[idx];
-          if (!slot) slot = acc.toolCalls[idx] = { id: '', type: 'function', function: { name: '', arguments: '' } };
-          if (tc.id) slot.id = tc.id;
-          if (tc.function) {
-            if (tc.function.name) slot.function.name = tc.function.name;
-            if (tc.function.arguments) slot.function.arguments += tc.function.arguments;
-          }
-        });
+  const decoder = new TextDecoder();
+  let buffer = '', ended = false;
+  try {
+    while (!ended) {
+      const part = await reader.read();
+      if (part.done) { ended = true; buffer += decoder.decode(); }
+      else buffer += decoder.decode(part.value, { stream: true });
+      let newline;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (!line || line.startsWith(':') || !line.startsWith('data:')) continue;
+        consumePayload(line.slice(5).trim());
       }
-      onState(acc);
     }
+    const tail = buffer.trim();
+    if (tail && tail.startsWith('data:')) consumePayload(tail.slice(5).trim());
+  } finally {
+    try { reader.releaseLock(); } catch (error) {}
   }
   acc.toolCalls = acc.toolCalls.filter(Boolean);
-  if (buf.trim() && buf.trim().startsWith('data:')) {
-    const tail = buf.trim().slice(5).trim();
-    if (tail && tail !== '[DONE]') {
-      try {
-        const event = JSON.parse(tail);
-        if (event.usage) acc.usage = event.usage;
-        const choice = event.choices && event.choices[0];
-        if (choice) {
-          const delta = choice.delta || choice.message || {};
-          if (delta.content) acc.content += delta.content;
-          if (delta.refusal) acc.refusal += delta.refusal;
-          if (delta.tool_calls) delta.tool_calls.forEach((tc, k) => {
-            const ix = tc.index === undefined ? k : tc.index;
-            const slot = acc.toolCalls[ix] || (acc.toolCalls[ix] = { id: '', type: 'function', function: { name: '', arguments: '' } });
-            if (tc.id) slot.id = tc.id;
-            if (tc.function && tc.function.name) slot.function.name = tc.function.name;
-            if (tc.function && tc.function.arguments) slot.function.arguments += tc.function.arguments;
-          });
-          if (choice.finish_reason) acc.finishReason = choice.finish_reason;
-        }
-      } catch (e) {}
-    }
-  }
+  acc.content = String(acc.content || '').trim() ? acc.content : '';
+  acc.emptyFinal = !acc.content.trim() && !acc.toolCalls.length;
+  if (acc.emptyFinal && acc.reasoning.trim()) acc.emptyReasoning = true;
   return acc;
 }
 
@@ -4263,6 +4277,15 @@ async function buildVideoWithRecovery(messages, tools, onState, signal, original
           return result;
         }
         const recovered = buildSpecFromResponse(result);
+        if (!recovered && !(result.toolCalls || []).length && !String(result.content || '').trim() &&
+            (String(result.reasoning || '').trim() || result.finishReason)) {
+          const reason = result.finishReason || 'unknown';
+          window.__LAST_TOOL_CALL_DIAGNOSTIC =
+            'DeepSeek finished the thinking pass but returned no final answer or video tool call (finish_reason: ' + reason + '). ' +
+            'The agent stopped instead of starting another thinking pass. Turn Thinking OFF and retry, or choose a model that supports tool calls.';
+          window.STEP_NOTE = 'empty final response — stopped; no repeated thinking request';
+          return result;
+        }
         if (recovered) {
           window.STEP_NOTE = 'build recovered from structured JSON';
           return {
@@ -4483,7 +4506,10 @@ function wantsVideo(text) {
 
 /* run every tool call of one assistant turn, streaming its result into the chat */
 async function execToolCalls(acc, cur, messages) {
-  messages.push({ role: 'assistant', content: acc.content || null, tool_calls: acc.toolCalls });
+  const assistantTurn = { role: 'assistant', content: acc.content || null, tool_calls: acc.toolCalls };
+  // DeepSeek thinking + tools requires the complete reasoning_content on the follow-up request.
+  if (acc.reasoning) assistantTurn.reasoning_content = acc.reasoning;
+  messages.push(assistantTurn);
   for (const tc of acc.toolCalls) {
     const name = tc.function && tc.function.name;
     const rawArgs = (tc.function && tc.function.arguments) || '{}';
@@ -4581,7 +4607,10 @@ async function runAgent(userText) {
       const wire = reminder ? messages.concat([{ role: 'system', content: reminder }]) : messages;
       /* thinking is the expensive part of a step: let the model plan once, then
          run the mechanical tool steps without it */
-      window.THINK_OVERRIDE = newVideoBuild ? 'off' : ($('thinking').value === 'auto' ? (step === 0 ? 'on' : 'off') : null);
+      const composerThinkingOn = typeof window.AIVA_COMPOSER_THINKING === 'function'
+        ? window.AIVA_COMPOSER_THINKING()
+        : ($('thinking').value === 'on' || ($('thinking').value === 'auto' && step === 0));
+      window.THINK_OVERRIDE = newVideoBuild ? 'off' : (composerThinkingOn ? 'on' : 'off');
       /* step 0 plans on the picked model; routine tool steps are routed down */
       window.MODEL_OVERRIDE = step === 0 ? null : cheapModel($('model').value);
       const acc = await streamChat(wire, tools, render, ABORT.signal);
@@ -4611,6 +4640,19 @@ async function runAgent(userText) {
       }
 
       finalText = acc.content || '';
+      if (!finalText.trim() && !acc.toolCalls.length && (acc.reasoning || acc.finishReason)) {
+        const reason = acc.finishReason || 'unknown';
+        finalText = 'DeepSeek completed its thinking pass but returned no final response (finish_reason: ' + reason + '). ' +
+          'The agent stopped instead of repeating the thinking request. Turn Thinking OFF and retry, or select a model with a working final-answer/tool-call response.';
+        cur.body.textContent = finalText;
+        if (window.AIVA_DEBUG && window.AIVA_DEBUG.log) {
+          window.AIVA_DEBUG.log('agent_empty_final', {
+            finishReason: reason, reasoningCharacters: String(acc.reasoning || '').length,
+            contentCharacters: 0, toolCalls: 0
+          });
+        }
+        break;
+      }
       const asJson = tryJson(finalText);
       if (asJson && (asJson.spec || Array.isArray(asJson.scenes) || asJson.ops || asJson.action)) {
         if (asJson.say) cur.body.textContent = asJson.say;
