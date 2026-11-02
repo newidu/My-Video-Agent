@@ -71,13 +71,13 @@ for (const marker of ['function sendPrompt()', 'function syncSpec()', 'window.SK
  if (!source.includes(marker)) throw new Error('Original source validation failed; missing ' + marker);
 }
 const sections = [
- ['/* ============================================================\\n   CANVAS PRIMITIVES','/* ---------------- edit model ---------------- */','src/canvas/primitives.js'],
- ['/* ---------------- edit model ---------------- */','/* ============================================================\\n   Editor UI — select / drag / edit / delete / export','src/canvas/scene-engine.js'],
- ['/* ============================================================\\n   Editor UI — select / drag / edit / delete / export','/* ============================================================\\n   FONT TOOL','src/editor/interaction.js'],
- ['/* ============================================================\\n   FONT TOOL','/* ============================================================\\n   MUSIC & BEAT','src/features/fonts.js'],
- ['/* ============================================================\\n   MUSIC & BEAT','/* ============================================================\\n   TOOLBOX','src/features/audio-music.js'],
- ['/* ============================================================\\n   TOOLBOX','/* ============================================================\\n   DEEPSEEK AGENT','src/editor/history-and-audit.js'],
- ['/* ============================================================\\n   DEEPSEEK AGENT','/* ---------- tools ---------- */','src/agent/session-and-skills.js'],
+ ['/* ============================================================\n   CANVAS PRIMITIVES','/* ---------------- edit model ---------------- */','src/canvas/primitives.js'],
+ ['/* ---------------- edit model ---------------- */','/* ============================================================\n   Editor UI — select / drag / edit / delete / export','src/canvas/scene-engine.js'],
+ ['/* ============================================================\n   Editor UI — select / drag / edit / delete / export','/* ============================================================\n   FONT TOOL','src/editor/interaction.js'],
+ ['/* ============================================================\n   FONT TOOL','/* ============================================================\n   MUSIC & BEAT','src/features/fonts.js'],
+ ['/* ============================================================\n   MUSIC & BEAT','/* ============================================================\n   TOOLBOX','src/features/audio-music.js'],
+ ['/* ============================================================\n   TOOLBOX','/* ============================================================\n   DEEPSEEK AGENT','src/editor/history-and-audit.js'],
+ ['/* ============================================================\n   DEEPSEEK AGENT','/* ---------- tools ---------- */','src/agent/session-and-skills.js'],
  ['/* ---------- tools ---------- */','/* ---------- streaming model call ---------- */','src/agent/tools.js'],
  ['/* ---------- streaming model call ---------- */','/* ---------- the agent loop ---------- */','src/agent/model-streaming-context.js'],
  ['/* ---------- the agent loop ---------- */','/* ---------- applying the answer ---------- */','src/agent/loop.js'],
@@ -88,7 +88,7 @@ for (const [startMarker,endMarker,file] of sections) {
  const end = source.indexOf(endMarker, start + startMarker.length);
  if (start < 0 || end < 0 || end <= start) throw new Error('Could not resolve source section markers for ' + file);
  const expected = source.slice(start, end);
- const actual = fs.readFileSync(path.join(root,file),'utf8').split(/\\r?\\n/).slice(1).join('\\n');
+ const actual = fs.readFileSync(path.join(root,file),'utf8').split(/\r?\n/).slice(1).join('\n');
  if (actual !== expected) throw new Error('Extracted code differs from original source section in ' + file + '. Keep original/source.html and the modular file synchronized.');
 }
 const skillStart = source.indexOf('window.SKILL_FILES = ') + 'window.SKILL_FILES = '.length;
