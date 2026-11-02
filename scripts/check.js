@@ -45,6 +45,7 @@ if (html.includes('id="btnRestart" class="subtle-button"')) throw new Error('Dup
 const editorStart = html.indexOf('<main class="mainShell">');
 const editorEnd = html.indexOf('</main>',editorStart);
 const editorHtml = html.slice(editorStart,editorEnd);
+if (editorHtml.includes('class="sidebar-label"') || editorHtml.includes('⌘ K')) throw new Error('Redundant editor sidebar labels or a non-wired keyboard hint remain.');
 if (!editorHtml.includes('id="btnStart"') || !editorHtml.includes('id="scrub"') || !editorHtml.includes('id="btnPlay"')) throw new Error('Editor playback/timeline controls are incomplete.');
 if (!editorHtml.includes('id="btnSave"') || !editorHtml.includes('id="btnLoad"') || !editorHtml.includes('id="btnExport"')) throw new Error('Editor project/export actions are incomplete.');
 const settingsCssText = fs.readFileSync(settingsCss,'utf8');
