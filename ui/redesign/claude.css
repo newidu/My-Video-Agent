@@ -428,3 +428,28 @@ input[type="range"] { accent-color: var(--accent); }
   .topbar { gap: 8px; }
   .editorWorkspace { grid-template-rows: minmax(280px,1fr) 220px; }
 }
+
+/* Lean editor: hide inspector groups until they contain something to edit. */
+.inspector-section:has(> #itemBox > p),
+.inspector-section:has(> #sceneList:empty),
+.inspector-section:has(> #elList > p),
+.inspector-section:has(> #itemList > p) { display:none; }
+
+/* The canvas is self-explanatory; avoid spending a toolbar row on a second
+   "Preview" label when the topbar already contains the playback control. */
+.preview-toolbar { display:none; }
+
+/* Compact navigation now that the static workspace and project cards are gone. */
+.projectSidebar { padding-top:14px; }
+.projectSidebar .new-chat-button { margin-bottom:17px; }
+.projectSidebar .sidebar-section { margin-bottom:15px; }
+.projectSidebar .project-actions { margin-top:0; }
+.projectSidebar .quick-tools { gap:2px; }
+.projectSidebar .quick-tool { padding:6px 8px; }
+.projectSidebar .sidebar-bottom { padding-top:8px; }
+
+/* Keep the inspector focused on the current selection, scenes and actual changes. */
+#editPane { padding-top:0; }
+.inspector-header { min-height:48px; }
+.inspector-section { padding-bottom:3px; }
+#itemBox > p, #elList > p, #itemList > p { display:none; }
