@@ -24,7 +24,6 @@
       <button id="btnRedo" class="icon-button" title="Redo" aria-label="Redo">↷</button>
       <span class="toolbar-divider"></span>
       <button id="btnPlay" class="primary play-button">▶ <span>Preview</span></button>
-      <button id="btnRestart" class="subtle-button" title="Restart">↺</button>
       <span class="toolbar-divider"></span>
       <button id="btnExport" class="primary export-button">Export <span>↗</span></button>
       <div id="legacyEditorControls" hidden>
@@ -36,6 +35,7 @@
         <button id="btnLetter" type="button">Letters: ON</button>
         <button id="btnMusicOn" type="button">Music</button>
         <button id="btnFont" type="button">Fonts</button>
+        <button id="btnRestart" type="button">Restart</button>
       </div>
     </div>
 
@@ -47,7 +47,6 @@
       <input id="fontIn" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" hidden>
     </div>
   </header>
-
 
   <section id="settingsView" class="settings-view" hidden aria-label="Application settings">
     <div class="settings-header">
@@ -336,25 +335,13 @@
       </button>
 
       <div class="sidebar-section">
-        <div class="sidebar-label">WORKSPACE</div>
-        <div class="sidebar-current">
-          <span class="nav-symbol">▧</span>
-          <span>Video editor</span>
-          <span class="current-indicator"></span>
-        </div>
         <button id="btnOpenSettings" class="sidebar-nav">
           <span class="nav-symbol">⚙</span><span>Settings</span>
         </button>
       </div>
 
       <div class="sidebar-section project-section">
-        <div class="sidebar-label">PROJECT</div>
-        <div class="project-tile">
-          <div class="project-file-icon">▣</div>
-          <div class="project-file-copy">
-            <strong>Untitled project</strong>
-          </div>
-        </div>
+        <div class="sidebar-label">FILES</div>
         <div class="project-actions">
           <button id="btnLoad" class="sidebar-file-button"><span>↥</span> Open</button>
           <button id="btnSave" class="sidebar-file-button"><span>↓</span> Save</button>
@@ -384,10 +371,6 @@
           <button id="btnCompact" class="tiny icon-button" title="Summarise this session">⇲</button>
         </div>
       </div>
-
-
-
-
 
             <div id="chat" aria-live="polite"></div>
 
