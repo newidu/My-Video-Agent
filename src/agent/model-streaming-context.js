@@ -1,4 +1,4 @@
-/* Model streaming, task list and context compaction. Extracted from original/source.html lines 3952-4189. */
+/* Model transport, build recovery, context and task-list handling. Section boundaries are validated against original/source.html by scripts/check.js. */
 /* ---------- streaming model call ---------- */
 /* model routing (Claude-Code pattern): the expensive model thinks and plans,
    the cheap one grinds through the mechanical tool steps */
