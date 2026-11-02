@@ -46,8 +46,8 @@ const editorStart = html.indexOf('<main class="mainShell">');
 const editorEnd = html.indexOf('</main>',editorStart);
 const editorHtml = html.slice(editorStart,editorEnd);
 if (editorHtml.includes('class="sidebar-label"') || editorHtml.includes('⌘ K')) throw new Error('Redundant editor sidebar labels or a non-wired keyboard hint remain.');
-if (!editorHtml.includes('id="btnStart"') || !editorHtml.includes('id="scrub"') || !editorHtml.includes('id="btnPlay"')) throw new Error('Editor playback/timeline controls are incomplete.');
-if (!editorHtml.includes('id="btnSave"') || !editorHtml.includes('id="btnLoad"') || !editorHtml.includes('id="btnExport"')) throw new Error('Editor project/export actions are incomplete.');
+if (!editorHtml.includes('id="btnStart"') || !editorHtml.includes('id="scrub"') || !html.includes('id="btnPlay"')) throw new Error('Editor playback/timeline controls are incomplete.');
+if (!html.includes('id="btnUndo"') || !html.includes('id="btnRedo"') || !html.includes('id="btnExport"') || !editorHtml.includes('id="btnSave"') || !editorHtml.includes('id="btnLoad"')) throw new Error('Editor project/export actions are incomplete.');
 const settingsCssText = fs.readFileSync(settingsCss,'utf8');
 for (const rule of ['.settings-view[hidden]','.mainShell[hidden]','body.settings-open > .app > .topbar']) {
  if (!settingsCssText.includes(rule)) throw new Error('Settings/Editor navigation rule missing: ' + rule);
