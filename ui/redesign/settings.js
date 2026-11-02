@@ -232,6 +232,23 @@
   });
   $('baseUrl').addEventListener('change',saveProfile);
   $('model').addEventListener('change',saveProfile);
+  $('btnSetManualModel').addEventListener('click',() => {
+    const id = $('manualModel').value.trim();
+    if (!id) { setStatus('Enter a model ID first.',false); return; }
+    let option = [...$('model').options].find(item => item.value === id);
+    if (!option) {
+      option = document.createElement('option');
+      option.value = id;
+      option.textContent = id + ' (manual)';
+      $('model').insertBefore(option,$('model').firstChild);
+    }
+    $('model').value = id;
+    saveProfile();
+    setStatus('Selected model '+id+'.',true);
+  });
+  $('manualModel').addEventListener('keydown',event => {
+    if (event.key === 'Enter') { event.preventDefault(); $('btnSetManualModel').click(); }
+  });
   $('apiKey').addEventListener('change',() => { memKeys[activeProvider] = $('apiKey').value.trim(); });
   $('rememberKey').checked = getStorage('aiva_remember') !== '0';
   $('rememberKey').addEventListener('change',() => {
@@ -309,7 +326,11 @@
     letter.checked = wanted;
   }
   const grid = $('settingShowBeatGrid');
-  grid.checked = getStorage('aiva_show_beat_grid') === '1' || !!$('musGrid').checked;
+  grid.checked = getStorage('aiva_show_beat_grid') !== '' ? getStorage('aiva_show_beat_grid') === '1' : !!$('musGrid').checked;
+  if (getStorage('aiva_show_beat_grid') !== '') {
+    $('musGrid').checked = grid.checked;
+    $('musGrid').dispatchEvent(new Event('change',{bubbles:true}));
+  }
   grid.addEventListener('change',() => {
     $('musGrid').checked = grid.checked;
     $('musGrid').dispatchEvent(new Event('change',{bubbles:true}));
