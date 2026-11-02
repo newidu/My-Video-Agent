@@ -4038,7 +4038,7 @@ function toolSchema() {
 /* model routing (Claude-Code pattern): the expensive model thinks and plans,
    the cheap one grinds through the mechanical tool steps */
 const MODEL_ROUTE_STORE = 'aiva_route';
-const ROUTE_CHEAP = 'deepseek-v4-flash';
+const ROUTE_CHEAP = 'deepseek-flash';
 function cheapModel(picked) { return /pro|reasoner|opus|sonnet|gpt-5|large/.test(String(picked || '')) ? ROUTE_CHEAP : null; }
 async function streamChat(messages, tools, onState, signal, toolChoice, requestOptions) {
   requestOptions = requestOptions || {};
