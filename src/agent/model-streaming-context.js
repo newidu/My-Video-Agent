@@ -19,15 +19,23 @@ async function streamChat(messages, tools, onState, signal, toolChoice, requestO
   const forced = !!(toolChoice && toolChoice !== 'auto');
   if (tools && tools.length) { body.tools = tools; body.tool_choice = toolChoice || 'auto'; }
 
+  const selectedProvider = window.AIVA_PROVIDER_SETTINGS ? window.AIVA_PROVIDER_SETTINGS.current() : 'deepseek';
+  const isDeepSeekProvider = selectedProvider === 'deepseek';
   // Explicit request/agent overrides always beat the composer preference.
   let think = requestOptions.thinking || window.THINK_OVERRIDE;
   if (!think && typeof window.AIVA_COMPOSER_THINKING === 'function') think = window.AIVA_COMPOSER_THINKING() ? 'on' : 'off';
   if (!think) think = $('thinking').value;
-  if (think === 'on') body.thinking = { type: 'enabled' };
-  else if (think === 'off') body.thinking = { type: 'disabled' };
-  window.THINK_BLOCKED = window.THINK_BLOCKED || {};
-  if (body.thinking && body.thinking.type === 'enabled' && window.THINK_BLOCKED[model]) body.thinking = { type: 'disabled' };
-  if (forced && body.thinking && body.thinking.type === 'enabled') body.thinking = { type: 'disabled' };
+  // "thinking" and stream_options.include_usage are DeepSeek-specific fields.
+  if (isDeepSeekProvider) {
+    if (think === 'on') body.thinking = { type: 'enabled' };
+    else if (think === 'off') body.thinking = { type: 'disabled' };
+    window.THINK_BLOCKED = window.THINK_BLOCKED || {};
+    if (body.thinking && body.thinking.type === 'enabled' && window.THINK_BLOCKED[model]) body.thinking = { type: 'disabled' };
+    if (forced && body.thinking && body.thinking.type === 'enabled') body.thinking = { type: 'disabled' };
+  } else {
+    delete body.stream_options;
+    delete body.thinking;
+  }
 
   const post = requestBody => fetch(apiBase() + '/chat/completions', {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey() },
@@ -36,7 +44,7 @@ async function streamChat(messages, tools, onState, signal, toolChoice, requestO
   let res = await post(body);
   if (!res.ok) {
     let txt = await res.text();
-    if (res.status === 400 && /think|tool_choice|function call/i.test(txt)) {
+    if (isDeepSeekProvider && res.status === 400 && /think|tool_choice|function call/i.test(txt)) {
       window.THINK_BLOCKED[model] = true;
       agentStatus(model + ' rejected the thinking/tool-choice combination — retrying explicitly with Thinking OFF.');
       // DeepSeek enables thinking by default when this property is omitted.
