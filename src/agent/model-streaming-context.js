@@ -355,9 +355,10 @@ function renderTodos(todos) {
   if (!TODO_EL) {
     TODO_EL = document.createElement('div');
     TODO_EL.className = 'todo';
-    const host = document.querySelector('.msg.bot:last-of-type');
-    if (host) host.insertBefore(TODO_EL, host.querySelector('.usage'));
   }
+  /* Re-parent the live task list on every turn so it stays beside current work. */
+  const host = document.querySelector('.msg.bot:last-of-type');
+  if (host && TODO_EL.parentNode !== host) host.insertBefore(TODO_EL, host.querySelector('.usage'));
   TODO_EL.innerHTML = html;
   $('chat').scrollTop = $('chat').scrollHeight;
 }
