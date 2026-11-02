@@ -324,14 +324,9 @@ const TOOL_IMPL = {
     const p = args && args.path;
     if (!p || !SKILL_FILES[p]) return 'unknown file. Available:\n' + SKILL_ORDER.join('\n');
     const txt = SKILL_FILES[p];
-    /* read-once policy: a second read of the same file is 3-6k tokens of text
-       the model already has — send only the head and say so */
-    FILE_READS[p] = (FILE_READS[p] || 0) + 1;
-    if (FILE_READS[p] > 1) {
-      return '[repeat read — ' + p + ' is already in this conversation. Head only:]\n' +
-        txt.slice(0, 1200) + '\n…[re-read the earlier message for the rest]';
-    }
-    return txt.length > 12000 ? txt.slice(0, 12000) + '\n…(truncated at 12k chars — cite what you need)' : txt;
+    /* Skills are task references, not one-shot memory. Tool results are not
+       retained in CHAT across turns, so repeated reads must return the file. */
+    return txt.length > 16000 ? txt.slice(0, 16000) + '\n…(truncated at 16k chars — request a narrower section)' : txt;
   },
   replace_spec(args) {
     if (!args || !args.spec || !Array.isArray(args.spec.scenes)) return 'invalid spec: expected {spec:{format,scenes:[...]}}';
