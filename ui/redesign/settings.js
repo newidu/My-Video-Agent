@@ -268,6 +268,9 @@
           requestInfo = {
             provider: activeProvider, model: body.model || '', endpoint: safeEndpoint(url),
             thinkingSent: body.thinking.type, toggleAtRequest: thinkingEnabled,
+            thinkingSelect: $('thinking') ? $('thinking').value : 'missing',
+            thinkingOverride: window.THINK_OVERRIDE == null ? null : window.THINK_OVERRIDE,
+            modelOverride: window.MODEL_OVERRIDE == null ? null : window.MODEL_OVERRIDE,
             toolChoice: typeof body.tool_choice === 'string' ? body.tool_choice : (body.tool_choice ? 'named/function' : 'none'),
             forcedToolCall, stream: !!body.stream
           };
@@ -398,9 +401,11 @@
   if (thinkingToggle) {
     thinkingToggle.addEventListener('click',() => {
       if (activeProvider !== 'deepseek') return;
+      const wasEnabled = thinkingEnabled;
       thinkingEnabled = !thinkingEnabled;
       setStorage('aiva_composer_thinking',thinkingEnabled ? '1' : '0');
       syncThinkingToggle();
+      debugLog('thinking_toggle_changed', { before: wasEnabled, enabled: thinkingEnabled, provider: activeProvider });
     });
     syncThinkingToggle();
   }
