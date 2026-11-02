@@ -68,6 +68,8 @@ if (!agentSession.includes('TASK PREFLIGHT') || agentSession.includes('Do not ca
 if (!agentLoop.includes('runAgentPreflight') || !agentLoop.includes('MAX_AGENT_STEPS') || agentLoop.includes('SAFE_CAP = 999')) throw new Error('Agent preflight and bounded loop guard are missing.');
 if (!agentTools.includes('read-once policy') && agentTools.includes('repeat read —')) throw new Error('Skill files must be readable again on later tasks.');
 if (!agentLoop.includes('const reportText = TOOL_IMPL.verify_video({})')) throw new Error('A completed task must be verified before the agent stops.');
+if (!agentLoop.includes("'apply_ops', 'add_element', 'set_text', 'remove_element'")) throw new Error('A first-build agent must retain edit tools for post-build refinement.');
+if (!modelStream.includes('TODO_EL.parentNode !== host')) throw new Error('The live Todo panel must move into the current agent bubble on every new turn.');
 
 if (html.includes('project-tile') || html.includes('Untitled project')) throw new Error('Static project placeholder remains in the editor sidebar.');
 if (html.includes('class="preview-toolbar"')) throw new Error('Redundant preview heading remains above the canvas.');
