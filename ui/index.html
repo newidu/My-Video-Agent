@@ -222,8 +222,12 @@
         <section class="settings-card">
           <div class="settings-card-heading"><div><span class="settings-kicker">COMPATIBILITY</span><h3>Provider support</h3></div></div>
           <div class="provider-capability-grid">
-            <div><span class="capability-ok">● Supported through compatible API</span><p>DeepSeek, OpenAI, OpenRouter, Groq, Together, Fireworks, Mistral, xAI, Gemini-compatible endpoint, Ollama, LM Studio, vLLM and custom endpoints.</p></div>
+            <div><span class="capability-ok">● Supported through compatible API</span><p>DeepSeek, OpenAI, OpenRouter, Groq, Together, Fireworks, Mistral, xAI, Gemini-compatible, DeepInfra, Cerebras, SambaNova, NVIDIA NIM, Hugging Face, Ollama, LM Studio, vLLM and custom endpoints.</p></div>
             <div><span class="capability-pending">○ Native adapter planned</span><p>Anthropic Messages API, AWS Bedrock, Google Vertex AI and Azure-specific authentication need provider-native request/auth adapters. They are not presented as working until implemented.</p></div>
+          </div>
+          <div class="settings-media-note">
+            <b>Video, image and speech-generation services</b>
+            <p>This build connects text/agent models only. It does not yet have configurable third-party video generation, image generation, transcription or text-to-speech API adapters. Video compositions are rendered by the built-in canvas editor; music and beat synthesis use the existing local audio engine.</p>
           </div>
         </section></section>
         <section class="settings-panel" data-settings-panel="skills"><div class="settings-page-heading"><span class="settings-kicker">AGENT KNOWLEDGE</span><h1>Skills</h1><p>Manage the instruction library used by the video agent.</p></div>
