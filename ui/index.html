@@ -188,7 +188,11 @@
                 </select>
                 <button id="btnModels" class="settings-secondary-button">↻ Load models</button>
               </div>
-              <small class="settings-help">Loads available model IDs from the selected endpoint's /models route.</small>
+              <div class="settings-inline-input">
+                <input id="manualModel" class="settings-wide-input" type="text" placeholder="Or type a model ID manually…" spellcheck="false">
+                <button id="btnSetManualModel" class="settings-secondary-button">Use model</button>
+              </div>
+              <small class="settings-help">Load available IDs from /models or enter a model ID manually.</small>
             </div>
             <div class="setting-field">
               <label for="apiKey">API key / access token</label>
