@@ -223,3 +223,82 @@ body[data-theme="light"] .settings-skill-box .skillView { background:#fafaf8; co
   .settings-inline-input { align-items:stretch; flex-direction:column; }
   .setting-row { gap:10px; }
 }
+
+.settings-media-note {
+  margin-top:13px; padding:12px 13px; border:1px solid #4c4438; border-radius:8px;
+  background:#292720;
+}
+.settings-media-note b { color:#d9c29f; font-size:10px; }
+.settings-media-note p { margin:5px 0 0; color:#a9a397; font-size:9.5px; line-height:1.55; }
+body[data-theme="graphite"] .settings-media-note { background:#25313b; border-color:#3e5362; }
+body[data-theme="graphite"] .settings-media-note b { color:#acc8dc; }
+body[data-theme="light"] .settings-media-note { background:#f8f0e8; border-color:#e2c9b7; }
+body[data-theme="light"] .settings-media-note b { color:#78503a; }
+body[data-theme="light"] .settings-media-note p { color:#76695f; }
+
+/* Extend the selected theme to the editor chrome, not just the Settings page. */
+body[data-theme="light"] .topbar,
+body[data-theme="light"] .preview-toolbar,
+body[data-theme="light"] .transport,
+body[data-theme="light"] #agentPane,
+body[data-theme="light"] #editPane,
+body[data-theme="light"] .projectSidebar,
+body[data-theme="light"] .center,
+body[data-theme="light"] .editorWorkspace,
+body[data-theme="light"] .mainShell { background:#f4f3ef; color:#292a25; border-color:#d9d7cf; }
+body[data-theme="light"] .topbar { border-bottom:1px solid #d9d7cf; }
+body[data-theme="light"] .projectSidebar { border-right:1px solid #d9d7cf; }
+body[data-theme="light"] #agentPane { border-right:1px solid #d9d7cf; }
+body[data-theme="light"] #editPane { border-left:1px solid #d9d7cf; }
+body[data-theme="light"] #chat { background:#f8f7f3; }
+body[data-theme="light"] .paneHead.agent-pane-head,
+body[data-theme="light"] .composer-shell { background:#f4f3ef; border-color:#dedcd4; }
+body[data-theme="light"] .composer { background:#fff; border-color:#d5d2ca; }
+body[data-theme="light"] .composer textarea { color:#30312c; }
+body[data-theme="light"] .msg.user { background:#efe3dc; color:#49372d; border-color:#e2c8b8; }
+body[data-theme="light"] .msg.bot { background:#fff; color:#34352f; border-color:#dddcd4; }
+body[data-theme="light"] .msg.sys { color:#77766f; border-color:#d7d5ce; }
+body[data-theme="light"] .sidebar-brand strong,
+body[data-theme="light"] .agent-heading strong,
+body[data-theme="light"] .inspector-header strong,
+body[data-theme="light"] .preview-heading strong { color:#30312c; }
+body[data-theme="light"] .sidebar-nav,
+body[data-theme="light"] .quick-tool,
+body[data-theme="light"] .sidebar-version,
+body[data-theme="light"] .conversation-label,
+body[data-theme="light"] #editPane h3 { color:#55564f; }
+body[data-theme="light"] .sidebar-current { background:#f0e5de; border-color:#e1c6b7; color:#594133; }
+body[data-theme="light"] .project-tile,
+body[data-theme="light"] .new-chat-button,
+body[data-theme="light"] #help { background:#fff; border-color:#deddd6; color:#45463f; }
+body[data-theme="light"] button { background:#fff; color:#34352f; border-color:#d6d4cc; }
+body[data-theme="light"] button.primary { background:#b87556; border-color:#b87556; color:#fff; }
+body[data-theme="light"] .topbar .subtle-button { background:transparent; color:#53544d; }
+body[data-theme="light"] select,
+body[data-theme="light"] input:not([type="checkbox"]):not([type="range"]),
+body[data-theme="light"] textarea { background:#fff; color:#30312c; border-color:#d3d1ca; }
+body[data-theme="light"] #stageWrap { background:radial-gradient(ellipse at 50% 47%,#e4e2dc 0%,#eeede8 55%,#e8e7e1 100%); }
+body[data-theme="light"] .inspector-header { background:#f4f3ef; border-color:#dedcd4; }
+body[data-theme="light"] #musicBox { background:#fff; color:#34352f; border-color:#deddd6; }
+body[data-theme="light"] #musicBox h4 { color:#9a634b; }
+body[data-theme="light"] #musicBox .mrow,
+body[data-theme="light"] #musicBox .muted2 { color:#706f68; }
+body[data-theme="light"] #musicBox .mrow b { color:#34352f; }
+body[data-theme="graphite"] .topbar,
+body[data-theme="graphite"] .preview-toolbar,
+body[data-theme="graphite"] .transport,
+body[data-theme="graphite"] #agentPane,
+body[data-theme="graphite"] #editPane,
+body[data-theme="graphite"] .projectSidebar,
+body[data-theme="graphite"] .center,
+body[data-theme="graphite"] .editorWorkspace,
+body[data-theme="graphite"] .mainShell { background:#171e26; border-color:#35424e; color:#e7edf3; }
+body[data-theme="graphite"] .paneHead.agent-pane-head,
+body[data-theme="graphite"] .composer-shell,
+body[data-theme="graphite"] .inspector-header { background:#1b242d; border-color:#35424e; }
+body[data-theme="graphite"] #chat { background:#171e26; }
+body[data-theme="graphite"] .composer { background:#202b35; border-color:#41505d; }
+body[data-theme="graphite"] .msg.bot { background:#222d37; border-color:#3d4a56; color:#e2e9ef; }
+body[data-theme="graphite"] .msg.user { background:#293949; border-color:#435a6c; color:#e4eef6; }
+body[data-theme="graphite"] .sidebar-current { background:#263747; border-color:#40576a; }
+body[data-theme="graphite"] #stageWrap { background:radial-gradient(ellipse at 50% 47%,#263543 0%,#1a222b 62%,#141a21 100%); }
