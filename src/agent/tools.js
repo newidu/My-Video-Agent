@@ -1,4 +1,4 @@
-/* Agent tool implementations, tool catalog and JSON tool schema. Extracted from original/source.html lines 3369-3951. */
+/* Video agent tool catalog, implementations and tool schemas. Section boundaries are validated against original/source.html by scripts/check.js. */
 /* ---------- tools ---------- */
 function codeErrNote() {
   const errs = Object.keys(window.CODE_ERRORS || {});
