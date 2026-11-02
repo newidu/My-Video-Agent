@@ -8,7 +8,8 @@ const html = fs.readFileSync(path.join(root, 'ui', 'index.html'), 'utf8');
 const scriptPaths = [...html.matchAll(/<script src="([^"]+)"\s*><\/script>/g)].map(m => m[1]);
 if (!scriptPaths.length) throw new Error('No ordered engine scripts found in ui/index.html');
 const settingsScript = './redesign/settings.js';
-const engineScriptPaths = scriptPaths.filter(p => p !== settingsScript);
+const debugScript = '../src/agent/debug.js';
+const engineScriptPaths = scriptPaths.filter(p => p !== settingsScript && p !== debugScript);
 const required = [
  '../src/skills/skill-manifest.js','../src/canvas/primitives.js','../src/canvas/scene-engine.js',
  '../src/editor/interaction.js','../src/features/fonts.js','../src/features/audio-music.js',
@@ -16,8 +17,8 @@ const required = [
  '../src/agent/model-streaming-context.js','../src/agent/loop.js','../src/agent/spec-bridge-and-boot.js'
 ];
 if (JSON.stringify(engineScriptPaths) !== JSON.stringify(required)) throw new Error('Engine script load order changed. Review ui/index.html and README.md.');
-if (scriptPaths[scriptPaths.length - 1] !== settingsScript) throw new Error('The settings controller must load after the classic engine scripts.');
-for (const relative of [...engineScriptPaths, settingsScript]) {
+if (scriptPaths[scriptPaths.length - 2] !== settingsScript || scriptPaths[scriptPaths.length - 1] !== debugScript) throw new Error('The Settings controller and independent debug script must load last.');
+for (const relative of [...engineScriptPaths, settingsScript, debugScript]) {
   const file = path.resolve(root, 'ui', relative);
   if (!file.startsWith(root + path.sep) || !fs.existsSync(file)) throw new Error('Missing or unsafe script path: ' + relative);
   const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
@@ -30,7 +31,7 @@ if ((cssText.match(/\{/g) || []).length !== (cssText.match(/\}/g) || []).length)
 const settingsHtmlIds = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map(m => m[1]);
 const duplicateIds = [...new Set(settingsHtmlIds.filter((id, i) => settingsHtmlIds.indexOf(id) !== i))];
 if (duplicateIds.length) throw new Error('Duplicate UI element IDs: ' + duplicateIds.join(', '));
-for (const id of ['settingsView','btnCloseSettings','btnOpenSettings','providerPreset','apiKey','baseUrl','model','skillBox','toolSettingsList','musicBox','settingDefaultFormat','settingExportBitrate','manualModel','btnFontSettings','btnThinkingToggle','thinkingToggleState','btnCopyDebug']) {
+for (const id of ['settingsView','btnCloseSettings','btnOpenSettings','providerPreset','apiKey','baseUrl','model','skillBox','toolSettingsList','musicBox','settingDefaultFormat','settingExportBitrate','manualModel','btnFontSettings','btnThinkingToggle','thinkingToggleState','btnCopyDebug','debugPanel','debugOutput','btnRefreshDebug','btnCopyDebugText','btnCloseDebug','debugCopyStatus']) {
  if (!settingsHtmlIds.includes(id)) throw new Error('Settings UI is missing required element: ' + id);
 }
 const legacyControls = html.match(/<div id="legacyEditorControls" hidden>([\s\S]*?)<\/div>/);
@@ -45,9 +46,14 @@ const agentLoop = fs.readFileSync(path.join(root, 'src', 'agent', 'loop.js'),'ut
 const agentTools = fs.readFileSync(path.join(root, 'src', 'agent', 'tools.js'),'utf8');
 const agentSession = fs.readFileSync(path.join(root, 'src', 'agent', 'session-and-skills.js'),'utf8');
 if (!modelStream.includes('async function buildVideoWithRecovery') || !modelStream.includes("choice: 'required'")) throw new Error('Video build recovery must live in the model transport and request required tool calls.');
-if (!settingsController.includes('aiva_composer_thinking') || !settingsController.includes('function syncThinkingToggle') || !settingsController.includes("thinkingEnabled && !forcedToolCall ? 'enabled' : 'disabled'")) throw new Error('Composer Thinking ON/OFF must persist and control DeepSeek request options.');
-if (!settingsController.includes('function debugReport()') || !settingsController.includes('async function copyDebugReport()') || !settingsController.includes("debugLog('model_request'") || !settingsController.includes("debugLog('model_api_error'") || !settingsController.includes("debugLog('agent_step'")) throw new Error('Copy Debug must capture model requests, API errors, and agent step/thinking events.');
-if (!settingsController.includes('prompt text, API keys and project media are not included')) throw new Error('Debug report privacy notice is missing.');
+if (!settingsController.includes('aiva_composer_thinking') || !settingsController.includes('function syncThinkingToggle') || !settingsController.includes('window.AIVA_COMPOSER_THINKING = () => thinkingEnabled')) throw new Error('Composer Thinking preference must be exposed to the engine.');
+if (settingsController.includes('window.fetch = (input, init)')) throw new Error('Settings must not overwrite request-level thinking decisions.');
+if (!modelStream.includes("b2.thinking = { type: 'disabled' }") || !modelStream.includes('window.AIVA_COMPOSER_THINKING()') || !modelStream.includes("selectedProvider === 'deepseek'")) throw new Error('DeepSeek fallback must explicitly disable thinking and use the composer toggle without leaking vendor fields to other providers.');
+if (!modelStream.includes("const ROUTE_CHEAP = 'deepseek-flash'") || !settingsController.includes("model:'deepseek-flash'") || !html.includes('value="deepseek-flash"')) throw new Error('DeepSeek settings and routing must use the current official model ID.');
+if (!agentLoop.includes('assistantTurn.reasoning_content = acc.reasoning')) throw new Error('DeepSeek reasoning_content must be preserved between tool calls.');
+if (!agentLoop.includes('DeepSeek completed its thinking pass but returned no final response')) throw new Error('Reasoning-only responses must stop rather than silently repeating.');
+const debugScriptText = fs.readFileSync(path.join(root, 'src', 'agent', 'debug.js'),'utf8');
+if (!debugScriptText.includes('function renderDebugReport(open)') || !debugScriptText.includes("debugLog('model_request'") || !debugScriptText.includes("debugLog('stream_finished'") || !debugScriptText.includes('btnCopyDebugText')) throw new Error('Independent debug UI must render logs and support copying.');
 if (settingsController.includes('installToolCallRecovery')) throw new Error('Model recovery must not be owned by the Settings UI.');
 if (!modelStream.includes('responseFormat: { type: \'json_object\' }') || !modelStream.includes('validVideoBuildSpec')) throw new Error('JSON-output fallback and video spec validation are missing.');
 if (!agentLoop.includes('buildVideoWithRecovery(messages, tools')) throw new Error('The agent loop does not call the first-class video build recovery.');

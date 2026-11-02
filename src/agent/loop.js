@@ -17,7 +17,11 @@ function wantsVideo(text) {
 
 /* run every tool call of one assistant turn, streaming its result into the chat */
 async function execToolCalls(acc, cur, messages) {
-  messages.push({ role: 'assistant', content: acc.content || null, tool_calls: acc.toolCalls });
+  const assistantTurn = { role: 'assistant', content: acc.content || null, tool_calls: acc.toolCalls };
+  // DeepSeek thinking + tools requires reasoning_content on the follow-up request.
+  const provider = window.AIVA_PROVIDER_SETTINGS ? window.AIVA_PROVIDER_SETTINGS.current() : 'deepseek';
+  if (provider === 'deepseek' && acc.reasoning) assistantTurn.reasoning_content = acc.reasoning;
+  messages.push(assistantTurn);
   for (const tc of acc.toolCalls) {
     const name = tc.function && tc.function.name;
     const rawArgs = (tc.function && tc.function.arguments) || '{}';
@@ -115,7 +119,10 @@ async function runAgent(userText) {
       const wire = reminder ? messages.concat([{ role: 'system', content: reminder }]) : messages;
       /* thinking is the expensive part of a step: let the model plan once, then
          run the mechanical tool steps without it */
-      window.THINK_OVERRIDE = newVideoBuild ? 'off' : ($('thinking').value === 'auto' ? (step === 0 ? 'on' : 'off') : null);
+      const composerThinkingOn = typeof window.AIVA_COMPOSER_THINKING === 'function'
+        ? window.AIVA_COMPOSER_THINKING()
+        : ($('thinking').value === 'on' || ($('thinking').value === 'auto' && step === 0));
+      window.THINK_OVERRIDE = newVideoBuild ? 'off' : (composerThinkingOn ? 'on' : 'off');
       /* step 0 plans on the picked model; routine tool steps are routed down */
       window.MODEL_OVERRIDE = step === 0 ? null : cheapModel($('model').value);
       const acc = await streamChat(wire, tools, render, ABORT.signal);
@@ -145,6 +152,19 @@ async function runAgent(userText) {
       }
 
       finalText = acc.content || '';
+      if (!finalText.trim() && !acc.toolCalls.length && (acc.reasoning || acc.finishReason)) {
+        const reason = acc.finishReason || 'unknown';
+        finalText = 'DeepSeek completed its thinking pass but returned no final response (finish_reason: ' + reason + '). ' +
+          'The agent stopped instead of repeating the thinking request. Turn Thinking OFF and retry, or select a model with a working final-answer/tool-call response.';
+        cur.body.textContent = finalText;
+        if (window.AIVA_DEBUG && window.AIVA_DEBUG.log) {
+          window.AIVA_DEBUG.log('agent_empty_final', {
+            finishReason: reason, reasoningCharacters: String(acc.reasoning || '').length,
+            contentCharacters: 0, toolCalls: 0
+          });
+        }
+        break;
+      }
       const asJson = tryJson(finalText);
       if (asJson && (asJson.spec || Array.isArray(asJson.scenes) || asJson.ops || asJson.action)) {
         if (asJson.say) cur.body.textContent = asJson.say;
