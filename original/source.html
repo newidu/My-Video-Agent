@@ -4320,7 +4320,7 @@ async function runAgent(userText) {
             ? 'Built ' + SPEC.scenes.length + ' scene' + (SPEC.scenes.length === 1 ? '' : 's') + ' · ' + DUR.toFixed(1) + 's.'
             : 'Still nothing was built — see the tool result above.';
         } else {
-          cur.body.textContent = 'The model refused to build (no tool call came back).';
+          cur.body.textContent = window.__LAST_TOOL_CALL_DIAGNOSTIC || 'The model did not return the replace_spec tool call. Check that the selected model supports tool calling.';
         }
         if (built) finalText = '';
         continue;
