@@ -1,4 +1,4 @@
-/* Agent session, credentials, chat UI, skill selection and system prompt. Extracted from original/source.html lines 2921-3368. */
+/* Agent session, skills and system prompt. Section boundaries are validated against original/source.html by scripts/check.js. */
 /* ============================================================
    DEEPSEEK AGENT — streaming chat + tool loop + video engine
    ============================================================ */
