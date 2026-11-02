@@ -24,7 +24,6 @@
       <button id="btnRedo" class="icon-button" title="Redo" aria-label="Redo">↷</button>
       <span class="toolbar-divider"></span>
       <button id="btnPlay" class="primary play-button">▶ <span>Preview</span></button>
-      <button id="btnRestart" class="subtle-button" title="Restart">↺</button>
       <span class="toolbar-divider"></span>
       <button id="btnExport" class="primary export-button">Export <span>↗</span></button>
       <div id="legacyEditorControls" hidden>
@@ -36,6 +35,7 @@
         <button id="btnLetter" type="button">Letters: ON</button>
         <button id="btnMusicOn" type="button">Music</button>
         <button id="btnFont" type="button">Fonts</button>
+        <button id="btnRestart" type="button">Restart</button>
       </div>
     </div>
 
@@ -47,7 +47,6 @@
       <input id="fontIn" type="file" accept=".ttf,.otf,.woff,.woff2,font/*" hidden>
     </div>
   </header>
-
 
   <section id="settingsView" class="settings-view" hidden aria-label="Application settings">
     <div class="settings-header">
@@ -324,37 +323,18 @@
 
   <main class="mainShell">
     <aside class="projectSidebar" aria-label="Workspace navigation">
-      <div class="sidebar-brand">
-        <span class="sidebar-logo" aria-hidden="true">✳</span>
-        <div><strong>My Video Agent</strong><small>Creative workspace</small></div>
-      </div>
-
       <button id="btnClearChat" class="new-chat-button">
         <span class="new-chat-icon">＋</span>
         <span>New conversation</span>
-        <kbd>⌘ K</kbd>
       </button>
 
       <div class="sidebar-section">
-        <div class="sidebar-label">WORKSPACE</div>
-        <div class="sidebar-current">
-          <span class="nav-symbol">▧</span>
-          <span>Video editor</span>
-          <span class="current-indicator"></span>
-        </div>
         <button id="btnOpenSettings" class="sidebar-nav">
           <span class="nav-symbol">⚙</span><span>Settings</span>
         </button>
       </div>
 
       <div class="sidebar-section project-section">
-        <div class="sidebar-label">PROJECT</div>
-        <div class="project-tile">
-          <div class="project-file-icon">▣</div>
-          <div class="project-file-copy">
-            <strong>Untitled project</strong>
-          </div>
-        </div>
         <div class="project-actions">
           <button id="btnLoad" class="sidebar-file-button"><span>↥</span> Open</button>
           <button id="btnSave" class="sidebar-file-button"><span>↓</span> Save</button>
@@ -362,7 +342,6 @@
       </div>
 
       <div class="sidebar-section tools-section">
-        <div class="sidebar-label">TOOLS</div>
         <div class="quick-tools">
           <button id="btnCrop" class="quick-tool"><span class="quick-tool-icon">⌗</span><span>Cut / erase</span></button>
             <button id="btnPoster" class="quick-tool"><span class="quick-tool-icon">▧</span><span>Poster</span></button>
@@ -370,14 +349,14 @@
       </div>
 
       <div class="sidebar-bottom">
-        <button id="btnReset" class="reset-button"><span>↻</span> Reset workspace</button>
+        <button id="btnReset" class="reset-button" title="Discard editor changes and restore the generated video"><span>↻</span> Reset edits</button>
       </div>
     </aside>
 
     <aside id="agentPane">
       <div class="paneHead agent-pane-head">
         <div class="agent-heading">
-                    <strong>Video agent</strong>
+          <strong>Video agent</strong>
         </div>
         <div class="agent-head-actions">
           <span id="usage" class="usage" title="Tokens used this session">— tok</span>
@@ -385,11 +364,7 @@
         </div>
       </div>
 
-
-
-
-
-            <div id="chat" aria-live="polite"></div>
+      <div id="chat" aria-live="polite"></div>
 
       <div class="composer-shell">
         <div class="composer">
@@ -398,7 +373,7 @@
             <label class="attach-video" title="Add a source video">＋ <span>Video</span>
               <input id="fileVideo" type="file" accept="video/*" hidden>
             </label>
-            <button id="btnStop" class="stop-button">Stop</button>
+            <button id="btnStop" class="stop-button" disabled>Stop</button>
             <button id="btnSend" class="primary send-button">Run agent <span>↑</span></button>
           </div>
           <p id="agentStatus" class="muted small"></p>
@@ -408,7 +383,6 @@
 
     <section class="editorWorkspace" aria-label="Video editing workspace">
       <section class="center">
-        <div class="preview-toolbar"><strong>Preview</strong></div>
         <div id="stageWrap">
           <div class="stageInner" id="stageInner">
             <canvas id="stage" width="1080" height="1920"></canvas>

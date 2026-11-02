@@ -35,10 +35,19 @@ for (const id of ['settingsView','btnCloseSettings','btnOpenSettings','providerP
 }
 const legacyControls = html.match(/<div id="legacyEditorControls" hidden>([\s\S]*?)<\/div>/);
 if (!legacyControls) throw new Error('Legacy engine controls must stay hidden outside the Settings UI.');
-for (const id of ['formatSel','btnLetter','btnMusicOn','btnFont']) {
+for (const id of ['formatSel','btnLetter','btnMusicOn','btnFont','btnRestart']) {
  if (!legacyControls[1].includes('id="' + id + '"')) throw new Error('Editor preference control must be hidden and managed in Settings: ' + id);
 }
 if (html.includes('id="btnOpenSkills"') || html.includes('id="btnMusic"')) throw new Error('A Settings-only shortcut is still visible in the editor.');
+if (html.includes('project-tile') || html.includes('Untitled project')) throw new Error('Static project placeholder remains in the editor sidebar.');
+if (html.includes('class="preview-toolbar"')) throw new Error('Redundant preview heading remains above the canvas.');
+if (html.includes('id="btnRestart" class="subtle-button"')) throw new Error('Duplicate restart action remains in the top toolbar.');
+const editorStart = html.indexOf('<main class="mainShell">');
+const editorEnd = html.indexOf('</main>',editorStart);
+const editorHtml = html.slice(editorStart,editorEnd);
+if (editorHtml.includes('class="sidebar-label"') || editorHtml.includes('⌘ K')) throw new Error('Redundant editor sidebar labels or a non-wired keyboard hint remain.');
+if (!editorHtml.includes('id="btnStart"') || !editorHtml.includes('id="scrub"') || !html.includes('id="btnPlay"')) throw new Error('Editor playback/timeline controls are incomplete.');
+if (!html.includes('id="btnUndo"') || !html.includes('id="btnRedo"') || !html.includes('id="btnExport"') || !editorHtml.includes('id="btnSave"') || !editorHtml.includes('id="btnLoad"')) throw new Error('Editor project/export actions are incomplete.');
 const settingsCssText = fs.readFileSync(settingsCss,'utf8');
 for (const rule of ['.settings-view[hidden]','.mainShell[hidden]','body.settings-open > .app > .topbar']) {
  if (!settingsCssText.includes(rule)) throw new Error('Settings/Editor navigation rule missing: ' + rule);
