@@ -506,7 +506,7 @@
   const originalStreamChat = window.streamChat;
   if (typeof originalStreamChat !== 'function' || originalStreamChat.__aivaRecoveryInstalled) return;
 
-  const refusalPattern = /(?:\bI(?:'m| am) sorry\b[\s\S]{0,100}\b(?:cannot|can't|won't|unable)\b|\bI (?:cannot|can't|won't) (?:help|assist|create|generate|provide|make)\b|\bunable to (?:help|assist|create|generate)\b)/i;
+  const refusalPattern = /(?:\bI(?:'m| am) sorry,?\s*(?:but\s+)?I (?:cannot|can't) (?:assist with|help with|provide that|create that|generate that)\b|\bI (?:cannot|can't) (?:assist with|help with|provide that|create that|generate that)\b)/i;
   const isSafetyRefusal = result => !!(
     result && (
       result.refusal ||
