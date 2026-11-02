@@ -555,7 +555,13 @@
       } catch (error) {
         if (isAbort(error)) throw error;
         if (!/tool_choice|tool call|function call|unsupported|not supported/i.test(String(error && error.message || error))) throw error;
-        result = await originalStreamChat(retryMessages, [tool], onState, signal, 'auto');
+        try {
+          result = await originalStreamChat(retryMessages, [tool], onState, signal, 'auto');
+        } catch (autoError) {
+          if (isAbort(autoError)) throw autoError;
+          window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider rejected both required and automatic tool selection: ' + String(autoError && autoError.message || autoError).slice(0, 220);
+          return null;
+        }
         if (result && result.toolCalls && result.toolCalls.length) {
           window.STEP_NOTE = 'build tool recovered with automatic tool selection';
         }
@@ -566,7 +572,13 @@
       }
       if (!isSafetyRefusal(result)) {
         const explicitChoice = { type: 'function', function: { name } };
-        const explicit = await originalStreamChat(retryMessages, [tool], onState, signal, explicitChoice);
+        let explicit = null;
+        try {
+          explicit = await originalStreamChat(retryMessages, [tool], onState, signal, explicitChoice);
+        } catch (explicitError) {
+          if (isAbort(explicitError)) throw explicitError;
+          window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider rejected the replace_spec function choice: ' + String(explicitError && explicitError.message || explicitError).slice(0, 220);
+        }
         if (explicit && explicit.toolCalls && explicit.toolCalls.length) {
           window.STEP_NOTE = 'build tool recovered with a single-tool function choice';
           return explicit;
@@ -626,7 +638,10 @@
       }
       const recovered = await retryWithOnlyBuildTool(messages, tools, onState, signal, 'replace_spec');
       if (recovered && recovered.toolCalls && recovered.toolCalls.length) return recovered;
-      throw error;
+      if (!window.__LAST_TOOL_CALL_DIAGNOSTIC) {
+        window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider rejected tool calling: ' + String(error && error.message || error).slice(0, 240);
+      }
+      return recovered || { content: '', toolCalls: [], usage: null };
     }
 
     if (!isBuildCall || (first.toolCalls && first.toolCalls.length)) return first;
