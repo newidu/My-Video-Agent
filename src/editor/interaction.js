@@ -880,16 +880,35 @@ function exportPoster() {
 }
 
 /* ---------------- project save / load ---------------- */
-function saveProject() {
+async function saveProject() {
   SPEC.fonts = Object.keys(CUSTOM_FONTS).length ? CUSTOM_FONTS : undefined;
-  const data = JSON.stringify({ spec: SPEC, items: EDIT.items, scenes: EDIT.scenes, base: EDIT.base }, null, 2);
-  download(new Blob([data], { type: 'application/json' }), 'ai-video-project.json');
+  let media = null;
+  try {
+    if (MEDIA.video && MEDIA.url) {
+      const response = await fetch(MEDIA.url);
+      const blob = await response.blob();
+      if (blob.size > 50 * 1024 * 1024) throw new Error('uploaded video is larger than the 50 MB project limit');
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('could not read uploaded video'));
+        reader.readAsDataURL(blob);
+      });
+      media = { dataUrl, name: MEDIA.name || 'Imported video', mime: MEDIA.mime || blob.type };
+    }
+    const data = JSON.stringify({ spec: SPEC, media, items: EDIT.items, scenes: EDIT.scenes, base: EDIT.base }, null, 2);
+    download(new Blob([data], { type: 'application/json' }), 'ai-video-project.json');
+    document.getElementById('status').textContent = media ? 'Project saved with uploaded media.' : 'Project saved.';
+  } catch (error) {
+    document.getElementById('status').textContent = 'Could not save project: ' + String(error.message || error);
+  }
 }
 function loadProject(file) {
   const fr = new FileReader();
   fr.onload = () => {
     try {
       const d = JSON.parse(fr.result);
+      clearUploadedMedia();
       if (d.spec && typeof d.spec === 'object') {
         /* Normalize imported JSON just like agent output. This prevents a corrupt
            or hand-edited project from poisoning the scene timeline/render loop,
@@ -912,7 +931,10 @@ function loadProject(file) {
       EDIT.scenes = d.scenes || {};
       EDIT.base = d.base || EDIT.base;
       renderScenes(); refresh(); renderPanel(); renderItems();
-      document.getElementById('status').textContent = 'Project loaded.';
+      restoreUploadedMedia(d.media).then(restored => {
+        if (restored) syncSpec();
+        document.getElementById('status').textContent = restored ? 'Project loaded with uploaded media.' : 'Project loaded.';
+      });
     } catch (e) { document.getElementById('status').textContent = 'Could not read that file.'; }
   };
   fr.readAsText(file);

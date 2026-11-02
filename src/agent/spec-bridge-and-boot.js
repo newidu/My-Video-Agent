@@ -110,6 +110,26 @@ function startPlaybackMedia() {
   if (MEDIA.video) { try { MEDIA.video.currentTime = 0; } catch (e) {} const p = MEDIA.video.play(); if (p && p.catch) p.catch(() => {}); }
 }
 function stopPlaybackMedia() { if (MEDIA.video) { try { MEDIA.video.pause(); } catch (e) {} } }
+function clearUploadedMedia() {
+  stopPlaybackMedia();
+  try { if (MEDIA.node) MEDIA.node.disconnect(); } catch (e) {}
+  if (MEDIA.url && MEDIA.url.startsWith('blob:')) { try { URL.revokeObjectURL(MEDIA.url); } catch (e) {} }
+  Object.assign(MEDIA, { video: null, url: '', ready: false, el: null, scene: null, node: null, name: '', mime: '' });
+}
+function restoreUploadedMedia(payload) {
+  if (!payload || typeof payload.dataUrl !== 'string' || !payload.dataUrl.startsWith('data:')) return Promise.resolve(false);
+  return new Promise(resolve => {
+    const v = document.createElement('video');
+    v.src = payload.dataUrl; v.playsInline = true; v.preload = 'auto'; v.muted = false;
+    v.onloadeddata = () => {
+      MEDIA.video = v; MEDIA.url = payload.dataUrl; MEDIA.ready = true; MEDIA.node = null;
+      MEDIA.name = String(payload.name || 'Imported video'); MEDIA.mime = String(payload.mime || '');
+      ensureMediaAudio(); resolve(true);
+    };
+    v.onerror = () => resolve(false);
+    v.load();
+  });
+}
 function ensureMediaAudio() {
   ensureAudio();
   if (!MEDIA.node && actx && MEDIA.video) {
@@ -123,7 +143,9 @@ $('fileVideo').onchange = e => {
   const v = document.createElement('video');
   v.src = url; v.playsInline = true; v.preload = 'auto'; v.muted = false;
   v.onloadeddata = () => {
+    clearUploadedMedia();
     MEDIA.video = v; MEDIA.url = url; MEDIA.ready = true; MEDIA.node = null;
+    MEDIA.name = f.name; MEDIA.mime = f.type || '';
     const dur = Math.max(1, Math.min(30, v.duration || 6));
     const id = 'media' + (SPEC.scenes.length + 1);
     SPEC.scenes.push({

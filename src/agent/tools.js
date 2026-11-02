@@ -250,9 +250,11 @@ const TOOL_IMPL = {
     const sceneId = args && args.sceneId;
     const el = args && args.element;
     if (!sceneId || !el || typeof el !== 'object') return 'need {sceneId, element}';
-    const sc = SPEC.scenes.find(s => s.id === sceneId) || SPEC.scenes[0];
-    if (!sc) return 'there is no scene yet — call replace_spec first';
+    const sc = SPEC.scenes.find(s => s.id === sceneId);
+    if (!sc) return 'no such scene: ' + sceneId;
+    if (!['text', 'code'].includes(el.type)) return 'element.type must be text or code';
     sc.elements = sc.elements || [];
+    if (sc.elements.length >= 40) return 'cannot add more than 40 elements to a scene';
     el.id = sc.id + '.e' + sc.elements.length;
     sc.elements.push(el);
     noteWrite();
@@ -359,7 +361,9 @@ const TOOL_IMPL = {
     for (let i = 0; i < args.spec.scenes.length; i++) {
       const scene = args.spec.scenes[i];
       if (!scene || typeof scene !== 'object') return 'invalid spec: scene ' + (i + 1) + ' is not an object';
-      if (!Number.isFinite(Number(scene.dur)) || Number(scene.dur) <= 0) return 'invalid spec: scene ' + (i + 1) + ' needs a positive numeric dur';
+      if (typeof scene.id !== 'string' || !scene.id.trim()) return 'invalid spec: scene ' + (i + 1) + ' needs a non-empty id';
+      if (args.spec.scenes.slice(0, i).some(previous => previous && previous.id === scene.id)) return 'invalid spec: duplicate scene id ' + scene.id;
+      if (!Number.isFinite(Number(scene.dur)) || Number(scene.dur) < 0.6 || Number(scene.dur) > 30) return 'invalid spec: scene ' + (i + 1) + ' dur must be between 0.6 and 30 seconds';
       if (!Array.isArray(scene.elements) || !scene.elements.length) return 'invalid spec: scene ' + (i + 1) + ' needs at least one text or code element';
       if (scene.elements.length > 40) return 'invalid spec: maximum 40 elements per scene';
       if (Array.isArray(scene.elements) && scene.elements.some(el => !el || !['text', 'code'].includes(el.type))) {

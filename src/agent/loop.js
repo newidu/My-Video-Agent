@@ -258,8 +258,13 @@ async function runAgent(userText) {
       finalText = acc.content || '';
       if (!finalText.trim() && !acc.toolCalls.length && (acc.reasoning || acc.finishReason)) {
         const reason = acc.finishReason || 'unknown';
-        finalText = 'DeepSeek completed its thinking pass but returned no final response (finish_reason: ' + reason + '). ' +
-          'The agent stopped instead of repeating the thinking request. Turn Thinking OFF and retry, or select a model with a working final-answer/tool-call response.';
+        const providerName = window.AIVA_PROVIDER_SETTINGS && window.AIVA_PROVIDER_SETTINGS.label
+          ? window.AIVA_PROVIDER_SETTINGS.label() : 'The selected provider';
+        const thinkingAdvice = provider === 'deepseek'
+          ? ' Turn Thinking OFF and retry, or select a model with a working final-answer/tool-call response.'
+          : ' Retry the request or choose a model with a working final-answer/tool-call response.';
+        finalText = providerName + ' (' + String($('model').value || 'selected model') + ') returned no final response (finish_reason: ' + reason + '). ' +
+          'The agent stopped instead of repeating the request.' + thinkingAdvice;
         cur.body.textContent = finalText;
         if (window.AIVA_DEBUG && window.AIVA_DEBUG.log) {
           window.AIVA_DEBUG.log('agent_empty_final', {

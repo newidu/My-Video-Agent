@@ -305,6 +305,10 @@ body[data-theme="graphite"] #stageWrap { background:radial-gradient(ellipse at 5
 
 /* Explicitly honour the hidden attribute. Component display rules must not override
    the screen switch used by the Settings <-> Editor navigation. */
+.responsive-settings-button { display: none; }
+@media (max-width: 920px) {
+  .responsive-settings-button { display: inline-flex; }
+}
 .settings-view[hidden],
 .mainShell[hidden],
 #legacyEditorControls[hidden] { display:none !important; }

@@ -51,7 +51,7 @@ if (settingsController.includes('window.fetch = (input, init)')) throw new Error
 if (!modelStream.includes("b2.thinking = { type: 'disabled' }") || !modelStream.includes('window.AIVA_COMPOSER_THINKING()') || !modelStream.includes("selectedProvider === 'deepseek'")) throw new Error('DeepSeek fallback must explicitly disable thinking and use the composer toggle without leaking vendor fields to other providers.');
 if (!modelStream.includes("const ROUTE_CHEAP = 'deepseek-flash'") || !settingsController.includes("model:'deepseek-flash'") || !html.includes('value="deepseek-flash"')) throw new Error('DeepSeek settings and routing must use the current official model ID.');
 if (!agentLoop.includes('assistantTurn.reasoning_content = acc.reasoning')) throw new Error('DeepSeek reasoning_content must be preserved between tool calls.');
-if (!agentLoop.includes('DeepSeek completed its thinking pass but returned no final response')) throw new Error('Reasoning-only responses must stop rather than silently repeating.');
+if (!agentLoop.includes('returned no final response') || !agentLoop.includes('providerName')) throw new Error('Reasoning-only responses must stop with a provider-aware diagnostic rather than silently repeating.');
 const debugScriptText = fs.readFileSync(path.join(root, 'src', 'agent', 'debug.js'),'utf8');
 if (!debugScriptText.includes('function renderDebugReport(open)') || !debugScriptText.includes("debugLog('model_request'") || !debugScriptText.includes("debugLog('stream_finished'") || !debugScriptText.includes('btnCopyDebugText')) throw new Error('Independent debug UI must render logs and support copying.');
 if (settingsController.includes('installToolCallRecovery')) throw new Error('Model recovery must not be owned by the Settings UI.');

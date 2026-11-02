@@ -1849,16 +1849,35 @@ function exportPoster() {
 }
 
 /* ---------------- project save / load ---------------- */
-function saveProject() {
+async function saveProject() {
   SPEC.fonts = Object.keys(CUSTOM_FONTS).length ? CUSTOM_FONTS : undefined;
-  const data = JSON.stringify({ spec: SPEC, items: EDIT.items, scenes: EDIT.scenes, base: EDIT.base }, null, 2);
-  download(new Blob([data], { type: 'application/json' }), 'ai-video-project.json');
+  let media = null;
+  try {
+    if (MEDIA.video && MEDIA.url) {
+      const response = await fetch(MEDIA.url);
+      const blob = await response.blob();
+      if (blob.size > 50 * 1024 * 1024) throw new Error('uploaded video is larger than the 50 MB project limit');
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('could not read uploaded video'));
+        reader.readAsDataURL(blob);
+      });
+      media = { dataUrl, name: MEDIA.name || 'Imported video', mime: MEDIA.mime || blob.type };
+    }
+    const data = JSON.stringify({ spec: SPEC, media, items: EDIT.items, scenes: EDIT.scenes, base: EDIT.base }, null, 2);
+    download(new Blob([data], { type: 'application/json' }), 'ai-video-project.json');
+    document.getElementById('status').textContent = media ? 'Project saved with uploaded media.' : 'Project saved.';
+  } catch (error) {
+    document.getElementById('status').textContent = 'Could not save project: ' + String(error.message || error);
+  }
 }
 function loadProject(file) {
   const fr = new FileReader();
   fr.onload = () => {
     try {
       const d = JSON.parse(fr.result);
+      clearUploadedMedia();
       if (d.spec && typeof d.spec === 'object') {
         /* Normalize imported JSON just like agent output. This prevents a corrupt
            or hand-edited project from poisoning the scene timeline/render loop,
@@ -1881,7 +1900,10 @@ function loadProject(file) {
       EDIT.scenes = d.scenes || {};
       EDIT.base = d.base || EDIT.base;
       renderScenes(); refresh(); renderPanel(); renderItems();
-      document.getElementById('status').textContent = 'Project loaded.';
+      restoreUploadedMedia(d.media).then(restored => {
+        if (restored) syncSpec();
+        document.getElementById('status').textContent = restored ? 'Project loaded with uploaded media.' : 'Project loaded.';
+      });
     } catch (e) { document.getElementById('status').textContent = 'Could not read that file.'; }
   };
   fr.readAsText(file);
@@ -3625,9 +3647,11 @@ const TOOL_IMPL = {
     const sceneId = args && args.sceneId;
     const el = args && args.element;
     if (!sceneId || !el || typeof el !== 'object') return 'need {sceneId, element}';
-    const sc = SPEC.scenes.find(s => s.id === sceneId) || SPEC.scenes[0];
-    if (!sc) return 'there is no scene yet — call replace_spec first';
+    const sc = SPEC.scenes.find(s => s.id === sceneId);
+    if (!sc) return 'no such scene: ' + sceneId;
+    if (!['text', 'code'].includes(el.type)) return 'element.type must be text or code';
     sc.elements = sc.elements || [];
+    if (sc.elements.length >= 40) return 'cannot add more than 40 elements to a scene';
     el.id = sc.id + '.e' + sc.elements.length;
     sc.elements.push(el);
     noteWrite();
@@ -3734,7 +3758,9 @@ const TOOL_IMPL = {
     for (let i = 0; i < args.spec.scenes.length; i++) {
       const scene = args.spec.scenes[i];
       if (!scene || typeof scene !== 'object') return 'invalid spec: scene ' + (i + 1) + ' is not an object';
-      if (!Number.isFinite(Number(scene.dur)) || Number(scene.dur) <= 0) return 'invalid spec: scene ' + (i + 1) + ' needs a positive numeric dur';
+      if (typeof scene.id !== 'string' || !scene.id.trim()) return 'invalid spec: scene ' + (i + 1) + ' needs a non-empty id';
+      if (args.spec.scenes.slice(0, i).some(previous => previous && previous.id === scene.id)) return 'invalid spec: duplicate scene id ' + scene.id;
+      if (!Number.isFinite(Number(scene.dur)) || Number(scene.dur) < 0.6 || Number(scene.dur) > 30) return 'invalid spec: scene ' + (i + 1) + ' dur must be between 0.6 and 30 seconds';
       if (!Array.isArray(scene.elements) || !scene.elements.length) return 'invalid spec: scene ' + (i + 1) + ' needs at least one text or code element';
       if (scene.elements.length > 40) return 'invalid spec: maximum 40 elements per scene';
       if (Array.isArray(scene.elements) && scene.elements.some(el => !el || !['text', 'code'].includes(el.type))) {
@@ -4212,10 +4238,15 @@ async function streamChat(messages, tools, onState, signal, toolChoice, requestO
       }
     }
     const tail = buffer.trim();
-    if (tail && tail.startsWith('data:')) consumePayload(tail.slice(5).trim());
+    if (tail) {
+      if (!tail.startsWith('data:')) throw new Error('API stream ended with an incomplete SSE event.');
+      consumePayload(tail.slice(5).trim());
+    }
   } finally {
     try { reader.releaseLock(); } catch (error) {}
   }
+  if (!acc.receivedDone) throw new Error('API stream ended before [DONE]; the response may be truncated.');
+  if (acc.parseWarnings) throw new Error('API stream contained ' + acc.parseWarnings + ' malformed event(s).');
   acc.toolCalls = acc.toolCalls.filter(Boolean);
   acc.content = String(acc.content || '').trim() ? acc.content : '';
   acc.emptyFinal = !acc.content.trim() && !acc.toolCalls.length;
@@ -4236,10 +4267,11 @@ function validVideoBuildSpec(spec) {
     Array.isArray(spec.scenes) && spec.scenes.length > 0 && spec.scenes.length <= 40 &&
     spec.scenes.every(scene =>
       scene && typeof scene === 'object' &&
-      Number.isFinite(Number(scene.dur)) && Number(scene.dur) > 0 &&
+      typeof scene.id === 'string' && scene.id.trim() &&
+      Number.isFinite(Number(scene.dur)) && Number(scene.dur) >= 0.6 && Number(scene.dur) <= 30 &&
       Array.isArray(scene.elements) && scene.elements.length > 0 && scene.elements.length <= 40 &&
       scene.elements.every(element => element && (element.type === 'text' || element.type === 'code'))
-    )
+    ) && new Set(spec.scenes.map(scene => scene.id)).size === spec.scenes.length
   );
 }
 
@@ -4514,9 +4546,18 @@ async function compactHistory(messages) {
     role: 'system',
     content: 'Compress this agent session into a handover note for a successor that must finish the same job. Keep, verbatim where it matters: the objective, the design decisions (palette, fonts, motion rules), scene/element ids that exist now, what failed and why, the open todo items. Max 200 words. No pleasantries.'
   }].concat(body);
-  const acc = await streamChat(req, null, () => {}, ABORT.signal);
+  let acc;
+  try {
+    /* Summaries must use the final-answer channel. If thinking is enabled here,
+       DeepSeek can return reasoning only and erase the successor's handover. */
+    acc = await streamChat(req, null, () => {}, ABORT.signal, null, { thinking: 'off', maxTokens: 1200 });
+  } catch (error) {
+    if (error && error.name === 'AbortError') throw error;
+    return messages;
+  }
   addUsage(acc.usage);
-  const summary = (acc.content || '').slice(0, 4000);
+  const summary = String(acc.content || '').trim().slice(0, 4000);
+  if (!summary) return messages;
   return [
     messages[0],
     { role: 'user', content: '[compacted earlier session — your own handover note]\n' + summary },
@@ -4783,8 +4824,13 @@ async function runAgent(userText) {
       finalText = acc.content || '';
       if (!finalText.trim() && !acc.toolCalls.length && (acc.reasoning || acc.finishReason)) {
         const reason = acc.finishReason || 'unknown';
-        finalText = 'DeepSeek completed its thinking pass but returned no final response (finish_reason: ' + reason + '). ' +
-          'The agent stopped instead of repeating the thinking request. Turn Thinking OFF and retry, or select a model with a working final-answer/tool-call response.';
+        const providerName = window.AIVA_PROVIDER_SETTINGS && window.AIVA_PROVIDER_SETTINGS.label
+          ? window.AIVA_PROVIDER_SETTINGS.label() : 'The selected provider';
+        const thinkingAdvice = provider === 'deepseek'
+          ? ' Turn Thinking OFF and retry, or select a model with a working final-answer/tool-call response.'
+          : ' Retry the request or choose a model with a working final-answer/tool-call response.';
+        finalText = providerName + ' (' + String($('model').value || 'selected model') + ') returned no final response (finish_reason: ' + reason + '). ' +
+          'The agent stopped instead of repeating the request.' + thinkingAdvice;
         cur.body.textContent = finalText;
         if (window.AIVA_DEBUG && window.AIVA_DEBUG.log) {
           window.AIVA_DEBUG.log('agent_empty_final', {
@@ -4999,6 +5045,26 @@ function startPlaybackMedia() {
   if (MEDIA.video) { try { MEDIA.video.currentTime = 0; } catch (e) {} const p = MEDIA.video.play(); if (p && p.catch) p.catch(() => {}); }
 }
 function stopPlaybackMedia() { if (MEDIA.video) { try { MEDIA.video.pause(); } catch (e) {} } }
+function clearUploadedMedia() {
+  stopPlaybackMedia();
+  try { if (MEDIA.node) MEDIA.node.disconnect(); } catch (e) {}
+  if (MEDIA.url && MEDIA.url.startsWith('blob:')) { try { URL.revokeObjectURL(MEDIA.url); } catch (e) {} }
+  Object.assign(MEDIA, { video: null, url: '', ready: false, el: null, scene: null, node: null, name: '', mime: '' });
+}
+function restoreUploadedMedia(payload) {
+  if (!payload || typeof payload.dataUrl !== 'string' || !payload.dataUrl.startsWith('data:')) return Promise.resolve(false);
+  return new Promise(resolve => {
+    const v = document.createElement('video');
+    v.src = payload.dataUrl; v.playsInline = true; v.preload = 'auto'; v.muted = false;
+    v.onloadeddata = () => {
+      MEDIA.video = v; MEDIA.url = payload.dataUrl; MEDIA.ready = true; MEDIA.node = null;
+      MEDIA.name = String(payload.name || 'Imported video'); MEDIA.mime = String(payload.mime || '');
+      ensureMediaAudio(); resolve(true);
+    };
+    v.onerror = () => resolve(false);
+    v.load();
+  });
+}
 function ensureMediaAudio() {
   ensureAudio();
   if (!MEDIA.node && actx && MEDIA.video) {
@@ -5012,7 +5078,9 @@ $('fileVideo').onchange = e => {
   const v = document.createElement('video');
   v.src = url; v.playsInline = true; v.preload = 'auto'; v.muted = false;
   v.onloadeddata = () => {
+    clearUploadedMedia();
     MEDIA.video = v; MEDIA.url = url; MEDIA.ready = true; MEDIA.node = null;
+    MEDIA.name = f.name; MEDIA.mime = f.type || '';
     const dur = Math.max(1, Math.min(30, v.duration || 6));
     const id = 'media' + (SPEC.scenes.length + 1);
     SPEC.scenes.push({

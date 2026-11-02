@@ -312,6 +312,8 @@
   document.querySelectorAll('[data-settings-target]').forEach(button => button.addEventListener('click',() => openSettings(button.dataset.settingsTarget)));
   document.querySelectorAll('[data-open-settings]').forEach(button => button.addEventListener('click',() => openSettings(button.dataset.openSettings)));
   $('btnOpenSettings').onclick = () => openSettings('general');
+  const topSettings = $('btnTopSettings');
+  if (topSettings) topSettings.onclick = () => openSettings('general');
   $('btnCloseSettings').onclick = closeSettings;
   $('btnFontSettings').onclick = () => $('btnFont').click();
 

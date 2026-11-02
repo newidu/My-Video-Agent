@@ -150,10 +150,15 @@ async function streamChat(messages, tools, onState, signal, toolChoice, requestO
       }
     }
     const tail = buffer.trim();
-    if (tail && tail.startsWith('data:')) consumePayload(tail.slice(5).trim());
+    if (tail) {
+      if (!tail.startsWith('data:')) throw new Error('API stream ended with an incomplete SSE event.');
+      consumePayload(tail.slice(5).trim());
+    }
   } finally {
     try { reader.releaseLock(); } catch (error) {}
   }
+  if (!acc.receivedDone) throw new Error('API stream ended before [DONE]; the response may be truncated.');
+  if (acc.parseWarnings) throw new Error('API stream contained ' + acc.parseWarnings + ' malformed event(s).');
   acc.toolCalls = acc.toolCalls.filter(Boolean);
   acc.content = String(acc.content || '').trim() ? acc.content : '';
   acc.emptyFinal = !acc.content.trim() && !acc.toolCalls.length;
@@ -174,10 +179,11 @@ function validVideoBuildSpec(spec) {
     Array.isArray(spec.scenes) && spec.scenes.length > 0 && spec.scenes.length <= 40 &&
     spec.scenes.every(scene =>
       scene && typeof scene === 'object' &&
-      Number.isFinite(Number(scene.dur)) && Number(scene.dur) > 0 &&
+      typeof scene.id === 'string' && scene.id.trim() &&
+      Number.isFinite(Number(scene.dur)) && Number(scene.dur) >= 0.6 && Number(scene.dur) <= 30 &&
       Array.isArray(scene.elements) && scene.elements.length > 0 && scene.elements.length <= 40 &&
       scene.elements.every(element => element && (element.type === 'text' || element.type === 'code'))
-    )
+    ) && new Set(spec.scenes.map(scene => scene.id)).size === spec.scenes.length
   );
 }
 
@@ -452,9 +458,18 @@ async function compactHistory(messages) {
     role: 'system',
     content: 'Compress this agent session into a handover note for a successor that must finish the same job. Keep, verbatim where it matters: the objective, the design decisions (palette, fonts, motion rules), scene/element ids that exist now, what failed and why, the open todo items. Max 200 words. No pleasantries.'
   }].concat(body);
-  const acc = await streamChat(req, null, () => {}, ABORT.signal);
+  let acc;
+  try {
+    /* Summaries must use the final-answer channel. If thinking is enabled here,
+       DeepSeek can return reasoning only and erase the successor's handover. */
+    acc = await streamChat(req, null, () => {}, ABORT.signal, null, { thinking: 'off', maxTokens: 1200 });
+  } catch (error) {
+    if (error && error.name === 'AbortError') throw error;
+    return messages;
+  }
   addUsage(acc.usage);
-  const summary = (acc.content || '').slice(0, 4000);
+  const summary = String(acc.content || '').trim().slice(0, 4000);
+  if (!summary) return messages;
   return [
     messages[0],
     { role: 'user', content: '[compacted earlier session — your own handover note]\n' + summary },
