@@ -146,6 +146,165 @@ function tryJson(txt) {
   try { return JSON.parse(t); } catch (e) { return null; }
 }
 
+function validVideoBuildSpec(spec) {
+  return !!(
+    spec && typeof spec === 'object' &&
+    Array.isArray(spec.scenes) && spec.scenes.length > 0 && spec.scenes.length <= 40 &&
+    spec.scenes.every(scene =>
+      scene && typeof scene === 'object' &&
+      Number.isFinite(Number(scene.dur)) && Number(scene.dur) > 0 &&
+      Array.isArray(scene.elements) && scene.elements.length <= 40 &&
+      scene.elements.every(element => element && (element.type === 'text' || element.type === 'code'))
+    )
+  );
+}
+
+function buildSpecFromResponse(result) {
+  const parsed = result && tryJson(result.content);
+  if (!parsed) return null;
+  const spec = parsed.spec || (Array.isArray(parsed.scenes) ? parsed : null);
+  if (!validVideoBuildSpec(spec)) return null;
+  return { parsed, spec };
+}
+
+function isBuildRefusal(result) {
+  if (!result) return false;
+  if (result.refusal || result.finishReason === 'content_filter') return true;
+  return /\bI(?:'m| am) sorry,?\s*(?:but\s+)?I (?:cannot|can't) (?:assist with|help with|provide that|create that|generate that)\b|\bI (?:cannot|can't) (?:assist with|help with|provide that|create that|generate that)\b/i.test(String(result.content || ''));
+}
+
+/* Recover the build in the agent transport itself, not in the Settings UI. */
+async function buildVideoWithRecovery(messages, tools, onState, signal, originalUserText) {
+  const buildTool = (tools || []).find(tool => tool && tool.function && tool.function.name === 'replace_spec');
+  if (!buildTool) {
+    window.__LAST_TOOL_CALL_DIAGNOSTIC = 'Video tools are disabled. Turn on Agent tools in Settings → Agent.';
+    return { content: '', toolCalls: [], usage: null };
+  }
+
+  const base = (messages || []).filter(message =>
+    message && (message.role === 'system' || message.role === 'user' || message.role === 'assistant')
+  ).slice(-12);
+  base.push({
+    role: 'system',
+    content:
+      'BUILD RECOVERY: the previous answer did not create the video. Call replace_spec now. ' +
+      'Do not answer with a plan or prose. Build a complete video with 3–6 scenes unless the user requests otherwise. ' +
+      'Every scene must have numeric dur, bg and an elements array. Each element type must be text or code. ' +
+      'Original request: ' + String(originalUserText || '').slice(0, 5000)
+  });
+
+  const previousThinking = window.THINK_OVERRIDE;
+  const previousModel = window.MODEL_OVERRIDE;
+  window.THINK_OVERRIDE = 'off';
+  window.MODEL_OVERRIDE = null;
+  window.__LAST_TOOL_CALL_DIAGNOSTIC = '';
+
+  try {
+    const attempts = [
+      { label: 'required tool mode', choice: 'required' },
+      { label: 'named function mode', choice: { type: 'function', function: { name: 'replace_spec' } } },
+      { label: 'automatic single-tool mode', choice: 'auto' }
+    ];
+    let lastResult = null;
+    let lastError = null;
+
+    for (const attempt of attempts) {
+      try {
+        const result = await streamChat(base, [buildTool], onState, signal, attempt.choice, {
+          thinking: 'off', maxTokens: 7000
+        });
+        lastResult = result;
+        if ((result.toolCalls || []).some(call => call.function && call.function.name === 'replace_spec')) {
+          window.STEP_NOTE = 'build recovered with ' + attempt.label;
+          return result;
+        }
+        if (isBuildRefusal(result)) {
+          window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider returned a safety refusal: ' + String(result.refusal || result.content || '').slice(0, 240);
+          return result;
+        }
+        const recovered = buildSpecFromResponse(result);
+        if (recovered) {
+          window.STEP_NOTE = 'build recovered from structured JSON';
+          return {
+            content: recovered.parsed.say || '',
+            reasoning: result.reasoning || '',
+            toolCalls: [{
+              id: 'call_json_recovered_replace_spec',
+              type: 'function',
+              function: { name: 'replace_spec', arguments: JSON.stringify({ spec: recovered.spec }) }
+            }],
+            usage: result.usage,
+            finishReason: result.finishReason
+          };
+        }
+      } catch (error) {
+        if (error && (error.name === 'AbortError' || /aborted/i.test(error.message || ''))) throw error;
+        lastError = error;
+        if (!error.retryableToolMode && !(error.status === 400 && /tool|function/i.test(error.message || ''))) break;
+      }
+    }
+
+    /* Compatibility path for models that can emit JSON but do not implement tools. */
+    const jsonMessages = base.concat([{
+      role: 'system',
+      content:
+        'Return only valid JSON, with no Markdown: {"spec":{"format":"9:16","scenes":[{"id":"s1","name":"Scene 1","dur":2.5,"bg":"#101820","elements":[{"type":"text","text":"...","x":540,"y":900,"size":100,"color":"#ffffff"}]}]}}. ' +
+        'Create the complete video requested above now.'
+    }]);
+    try {
+      let result;
+      try {
+        result = await streamChat(jsonMessages, null, onState, signal, null, {
+          thinking: 'off', maxTokens: 7000, responseFormat: { type: 'json_object' }
+        });
+      } catch (formatError) {
+        if (formatError && (formatError.name === 'AbortError' || /aborted/i.test(formatError.message || ''))) throw formatError;
+        result = await streamChat(jsonMessages, null, onState, signal, null, {
+          thinking: 'off', maxTokens: 7000
+        });
+      }
+      if (isBuildRefusal(result)) {
+        window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider returned a safety refusal: ' + String(result.refusal || result.content || '').slice(0, 240);
+        return result;
+      }
+      const recovered = buildSpecFromResponse(result);
+      if (recovered) {
+        window.STEP_NOTE = 'build recovered through JSON output mode';
+        return {
+          content: recovered.parsed.say || '',
+          reasoning: result.reasoning || '',
+          toolCalls: [{
+            id: 'call_json_mode_replace_spec',
+            type: 'function',
+            function: { name: 'replace_spec', arguments: JSON.stringify({ spec: recovered.spec }) }
+          }],
+          usage: result.usage,
+          finishReason: result.finishReason
+        };
+      }
+      lastResult = result || lastResult;
+    } catch (error) {
+      if (error && (error.name === 'AbortError' || /aborted/i.test(error.message || ''))) throw error;
+      lastError = error;
+    }
+
+    if (lastResult && isBuildRefusal(lastResult)) {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider refused this request: ' + String(lastResult.refusal || lastResult.content || '').slice(0, 240);
+    } else if (lastError) {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC = 'Video build request failed: ' + String(lastError.message || lastError).slice(0, 320);
+    } else {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC =
+        'The selected model did not return a replace_spec tool call or a valid video JSON spec. ' +
+        'Choose a model with tool-calling or JSON-output support.' +
+        (lastResult && lastResult.content ? ' Last response: ' + String(lastResult.content).slice(0, 180) : '');
+    }
+    return lastResult || { content: '', toolCalls: [], usage: null };
+  } finally {
+    window.THINK_OVERRIDE = previousThinking;
+    window.MODEL_OVERRIDE = previousModel;
+  }
+}
+
 /* ---------- task list (TodoWrite pattern) ---------- */
 let TODOS = [];
 let TODO_EL = null;
