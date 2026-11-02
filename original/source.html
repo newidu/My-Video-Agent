@@ -3708,8 +3708,8 @@ const TOOL_IMPL = {
       const scene = args.spec.scenes[i];
       if (!scene || typeof scene !== 'object') return 'invalid spec: scene ' + (i + 1) + ' is not an object';
       if (!Number.isFinite(Number(scene.dur)) || Number(scene.dur) <= 0) return 'invalid spec: scene ' + (i + 1) + ' needs a positive numeric dur';
-      if (scene.elements !== undefined && !Array.isArray(scene.elements)) return 'invalid spec: scene ' + (i + 1) + ' elements must be an array';
-      if (Array.isArray(scene.elements) && scene.elements.length > 40) return 'invalid spec: maximum 40 elements per scene';
+      if (!Array.isArray(scene.elements) || !scene.elements.length) return 'invalid spec: scene ' + (i + 1) + ' needs at least one text or code element';
+      if (scene.elements.length > 40) return 'invalid spec: maximum 40 elements per scene';
       if (Array.isArray(scene.elements) && scene.elements.some(el => !el || !['text', 'code'].includes(el.type))) {
         return 'invalid spec: scene ' + (i + 1) + ' contains an unsupported element type; use text or code';
       }
@@ -3961,6 +3961,7 @@ function toolSchema() {
                         js: { type: 'string', description: 'Optional deterministic scene background drawing code.' },
                         elements: {
                           type: 'array',
+                          minItems: 1,
                           maxItems: 40,
                           items: {
                             type: 'object',
@@ -4187,7 +4188,7 @@ function validVideoBuildSpec(spec) {
     spec.scenes.every(scene =>
       scene && typeof scene === 'object' &&
       Number.isFinite(Number(scene.dur)) && Number(scene.dur) > 0 &&
-      Array.isArray(scene.elements) && scene.elements.length <= 40 &&
+      Array.isArray(scene.elements) && scene.elements.length > 0 && scene.elements.length <= 40 &&
       scene.elements.every(element => element && (element.type === 'text' || element.type === 'code'))
     )
   );
@@ -4215,9 +4216,14 @@ async function buildVideoWithRecovery(messages, tools, onState, signal, original
     return { content: '', toolCalls: [], usage: null };
   }
 
-  const base = (messages || []).filter(message =>
-    message && (message.role === 'system' || message.role === 'user' || message.role === 'assistant')
-  ).slice(-12);
+  const systemMessage = (messages || []).find(message => message && message.role === 'system');
+  const history = (messages || []).filter(message =>
+    message && message !== systemMessage && (message.role === 'user' || message.role === 'assistant') &&
+    typeof message.content === 'string'
+  ).slice(-10);
+  const base = [];
+  if (systemMessage) base.push(systemMessage);
+  base.push(...history);
   base.push({
     role: 'system',
     content:
@@ -4463,9 +4469,16 @@ async function compactHistory(messages) {
 /* no step limit: the loop runs until the model stops calling tools (Stop button always works).
    SAFE_CAP only exists so a broken stream can never spin forever — it is far above any real run. */
 const SAFE_CAP = 999;
-/* a question about the footage is not a request to build */
+/* Distinguish an actual creation/edit brief from a question about existing footage.
+   Do not let a question mark inside a build brief disable the build path. */
 function wantsVideo(text) {
-  return !/[?]|\b(how many|how long|what|why|which|who|explain|tell me|read|count)\b/i.test(String(text || ''));
+  const value = String(text || '').trim();
+  if (!value) return false;
+  const action = /\b(create|make|generate|build|produce|design|render|edit|modify|change|add|remove|cut|trim|reframe|convert|turn into|animate|subtitle|caption|replace|shorten|extend)\b/i.test(value);
+  if (action) return true;
+  const startsAsQuestion = /^(?:what|why|how|who|which|explain|tell me|read|count|describe)\b/i.test(value);
+  const asksAboutFootage = /\b(video|clip|footage|reel|short|promo|trailer|explainer|intro)\b/i.test(value);
+  return !startsAsQuestion && asksAboutFootage && !/\?\s*$/.test(value);
 }
 
 /* run every tool call of one assistant turn, streaming its result into the chat */
