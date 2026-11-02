@@ -223,14 +223,15 @@
     editor.hidden = true;
     document.body.classList.add('settings-open');
     showPanel(panel || 'general');
-    if (panel === 'audio' && typeof window.toggleMusicBox === 'function') window.toggleMusicBox(true);
   }
   function closeSettings() {
     const view = $('settingsView'), editor = document.querySelector('.mainShell');
     if (!view || !editor) return;
-    view.hidden = true;
     editor.hidden = false;
+    view.hidden = true;
     document.body.classList.remove('settings-open');
+    const opener = $('btnOpenSettings');
+    if (opener) opener.focus({ preventScroll: true });
   }
 
   $('providerPreset').addEventListener('change',() => {
@@ -282,9 +283,8 @@
   document.querySelectorAll('[data-settings-target]').forEach(button => button.addEventListener('click',() => openSettings(button.dataset.settingsTarget)));
   document.querySelectorAll('[data-open-settings]').forEach(button => button.addEventListener('click',() => openSettings(button.dataset.openSettings)));
   $('btnOpenSettings').onclick = () => openSettings('general');
-  $('btnOpenSkills').onclick = () => openSettings('skills');
   $('btnCloseSettings').onclick = closeSettings;
-  $('btnMusic').onclick = () => openSettings('audio');
+  $('btnFontSettings').onclick = () => $('btnFont').click();
 
   /* Theme preference shared by Settings, editor, inspector and sidebars. */
   function applyTheme(theme) {
@@ -305,7 +305,12 @@
   /* Editor defaults: these controls write to the original editor controls rather than
      introducing a second independent copy of the editor state. */
   const format = $('settingDefaultFormat');
-  format.value = getStorage('aiva_default_format') || $('formatSel').value || '9:16';
+  const savedDefaultFormat = getStorage('aiva_default_format');
+  format.value = savedDefaultFormat || $('formatSel').value || '9:16';
+  if (savedDefaultFormat && $('formatSel').value !== savedDefaultFormat) {
+    $('formatSel').value = savedDefaultFormat;
+    $('formatSel').dispatchEvent(new Event('change',{bubbles:true}));
+  }
   format.addEventListener('change',() => setStorage('aiva_default_format',format.value));
   $('formatSel').addEventListener('change',() => {
     format.value = $('formatSel').value;
@@ -483,4 +488,12 @@
   startupReady = true;
   if (startup.value === 'settings') openSettings('general');
   else closeSettings();
+
+  document.addEventListener('keydown',event => {
+    if (event.key !== 'Escape' || $('settingsView').hidden) return;
+    const target = event.target;
+    if (target && /INPUT|TEXTAREA|SELECT/.test(target.tagName)) return;
+    event.preventDefault();
+    closeSettings();
+  });
 })();
