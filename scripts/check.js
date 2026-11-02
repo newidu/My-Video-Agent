@@ -49,6 +49,7 @@ if (!modelStream.includes('async function buildVideoWithRecovery') || !modelStre
 if (!settingsController.includes('aiva_composer_thinking') || !settingsController.includes('function syncThinkingToggle') || !settingsController.includes('window.AIVA_COMPOSER_THINKING = () => thinkingEnabled')) throw new Error('Composer Thinking preference must be exposed to the engine.');
 if (settingsController.includes('window.fetch = (input, init)')) throw new Error('Settings must not overwrite request-level thinking decisions.');
 if (!modelStream.includes("b2.thinking = { type: 'disabled' }") || !modelStream.includes('window.AIVA_COMPOSER_THINKING()')) throw new Error('DeepSeek fallback must explicitly disable thinking and use the composer toggle.');
+if (!modelStream.includes("const ROUTE_CHEAP = 'deepseek-flash'") || !settingsController.includes("model:'deepseek-flash'") || !html.includes('value="deepseek-flash"')) throw new Error('DeepSeek settings and routing must use the current official model ID.');
 if (!agentLoop.includes('assistantTurn.reasoning_content = acc.reasoning')) throw new Error('DeepSeek reasoning_content must be preserved between tool calls.');
 if (!agentLoop.includes('DeepSeek completed its thinking pass but returned no final response')) throw new Error('Reasoning-only responses must stop rather than silently repeating.');
 const debugScriptText = fs.readFileSync(path.join(root, 'src', 'agent', 'debug.js'),'utf8');
