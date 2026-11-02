@@ -7,18 +7,29 @@ const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'ui', 'index.html'), 'utf8');
 const scriptPaths = [...html.matchAll(/<script src="([^"]+)"\s*><\/script>/g)].map(m => m[1]);
 if (!scriptPaths.length) throw new Error('No ordered engine scripts found in ui/index.html');
+const settingsScript = './redesign/settings.js';
+const engineScriptPaths = scriptPaths.filter(p => p !== settingsScript);
 const required = [
  '../src/skills/skill-manifest.js','../src/canvas/primitives.js','../src/canvas/scene-engine.js',
  '../src/editor/interaction.js','../src/features/fonts.js','../src/features/audio-music.js',
  '../src/editor/history-and-audit.js','../src/agent/session-and-skills.js','../src/agent/tools.js',
  '../src/agent/model-streaming-context.js','../src/agent/loop.js','../src/agent/spec-bridge-and-boot.js'
 ];
-if (JSON.stringify(scriptPaths) !== JSON.stringify(required)) throw new Error('Script load order changed. Review ui/index.html and README.md.');
-for (const relative of scriptPaths) {
+if (JSON.stringify(engineScriptPaths) !== JSON.stringify(required)) throw new Error('Engine script load order changed. Review ui/index.html and README.md.');
+if (scriptPaths[scriptPaths.length - 1] !== settingsScript) throw new Error('The settings controller must load after the classic engine scripts.');
+for (const relative of [...engineScriptPaths, settingsScript]) {
   const file = path.resolve(root, 'ui', relative);
   if (!file.startsWith(root + path.sep) || !fs.existsSync(file)) throw new Error('Missing or unsafe script path: ' + relative);
   const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
   if (result.status !== 0) throw new Error(`Syntax check failed: ${relative}\n${result.stderr || result.stdout}`);
+}
+const settingsCss = path.join(root, 'ui', 'redesign', 'settings.css');
+if (!fs.existsSync(settingsCss)) throw new Error('Missing dedicated settings stylesheet.');
+const settingsHtmlIds = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map(m => m[1]);
+const duplicateIds = [...new Set(settingsHtmlIds.filter((id, i) => settingsHtmlIds.indexOf(id) !== i))];
+if (duplicateIds.length) throw new Error('Duplicate UI element IDs: ' + duplicateIds.join(', '));
+for (const id of ['settingsView','providerPreset','apiKey','baseUrl','model','skillBox','toolSettingsList','musicBox','settingDefaultFormat']) {
+ if (!settingsHtmlIds.includes(id)) throw new Error('Settings UI is missing required element: ' + id);
 }
 const source = fs.readFileSync(path.join(root, 'original', 'source.html'), 'utf8');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'skills', 'manifest.json'), 'utf8'));
@@ -48,4 +59,4 @@ for (const skill of manifest.order) {
  if (!fs.existsSync(skillFile)) throw new Error('Skill missing: ' + skill);
  if (fs.readFileSync(skillFile,'utf8') !== originalSkills[skill]) throw new Error('Skill content changed: ' + skill);
 }
-console.log(`OK: ${scriptPaths.length} ordered scripts; ${manifest.order.length} exact skill files; all engine chunks match original source.`);
+console.log(`OK: ${engineScriptPaths.length} ordered engine scripts + settings controller syntax; unique UI IDs; ${manifest.order.length} exact skill files; all engine chunks match original source.`);
