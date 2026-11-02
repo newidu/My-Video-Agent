@@ -497,3 +497,122 @@
     closeSettings();
   });
 })();
+
+
+/* Recover from OpenAI-compatible providers that return prose instead of the
+   requested build tool. Retry with only replace_spec exposed and tool_choice
+   required; do not retry an explicit safety refusal. */
+(function installToolCallRecovery() {
+  const originalStreamChat = window.streamChat;
+  if (typeof originalStreamChat !== 'function' || originalStreamChat.__aivaRecoveryInstalled) return;
+
+  const refusalPattern = /(?:\bI(?:'m| am) sorry\b[\s\S]{0,100}\b(?:cannot|can't|won't|unable)\b|\bI (?:cannot|can't|won't) (?:help|assist|create|generate|provide|make)\b|\bunable to (?:help|assist|create|generate)\b)/i;
+  const isSafetyRefusal = result => !!(
+    result && (
+      result.refusal ||
+      result.finishReason === 'content_filter' ||
+      (typeof result.content === 'string' && refusalPattern.test(result.content))
+    )
+  );
+
+  function isAbort(error) {
+    return !!(error && (error.name === 'AbortError' || /aborted/i.test(error.message || '')));
+  }
+
+  function buildRetryMessages(messages) {
+    const system = (messages || []).find(m => m && m.role === 'system');
+    const users = (messages || []).filter(m => m && m.role === 'user');
+    const originalRequest = users.length > 1 ? users[users.length - 2].content : (users[0] && users[0].content);
+    const retry = [];
+    if (system) retry.push(system);
+    retry.push({
+      role: 'user',
+      content:
+        'Build the requested video now. The canvas is empty. Do not describe a plan or answer with prose. ' +
+        'Call replace_spec exactly once with a complete valid video spec. ' +
+        'Create a visually coherent multi-scene composition with real text/code elements, scene durations, backgrounds and animation. ' +
+        'Original request: ' + String(originalRequest || '').slice(0, 6000)
+    });
+    return retry;
+  }
+
+  async function retryWithOnlyBuildTool(messages, tools, onState, signal, name) {
+    const tool = (tools || []).find(t => t && t.function && t.function.name === name);
+    if (!tool) return null;
+    const retryMessages = buildRetryMessages(messages);
+    const oldThinking = window.THINK_OVERRIDE;
+    const oldModel = window.MODEL_OVERRIDE;
+    window.THINK_OVERRIDE = 'off';
+    window.MODEL_OVERRIDE = null;
+
+    try {
+      let result;
+      try {
+        result = await originalStreamChat(retryMessages, [tool], onState, signal, 'required');
+      } catch (error) {
+        if (isAbort(error)) throw error;
+        if (!/tool_choice|tool call|function call|unsupported|not supported/i.test(String(error && error.message || error))) throw error;
+        result = await originalStreamChat(retryMessages, [tool], onState, signal, 'auto');
+        if (result && result.toolCalls && result.toolCalls.length) {
+          window.STEP_NOTE = 'build tool recovered with automatic tool selection';
+        }
+      }
+      if (result && result.toolCalls && result.toolCalls.length) {
+        window.STEP_NOTE = 'build tool recovered after a no-tool-call response';
+        return result;
+      }
+
+      /* Some compatible endpoints serialize the requested arguments as JSON
+         content instead of returning a standard tool_calls delta. Accept only
+         a valid video spec; never interpret refusal prose as an instruction. */
+      if (result && !isSafetyRefusal(result) && typeof result.content === 'string' && typeof window.tryJson === 'function') {
+        const parsed = window.tryJson(result.content);
+        const spec = parsed && (parsed.spec || (Array.isArray(parsed.scenes) ? parsed : null));
+        if (spec && Array.isArray(spec.scenes) && spec.scenes.length) {
+          result.toolCalls = [{
+            id: 'call_recovered_replace_spec',
+            type: 'function',
+            function: { name: 'replace_spec', arguments: JSON.stringify({ spec }) }
+          }];
+          result.content = parsed.say || '';
+          window.STEP_NOTE = 'video spec recovered from the provider JSON response';
+          return result;
+        }
+      }
+      return result;
+    } finally {
+      window.THINK_OVERRIDE = oldThinking;
+      window.MODEL_OVERRIDE = oldModel;
+    }
+  }
+
+  const recoveredStreamChat = async function(messages, tools, onState, signal, toolChoice) {
+    const isBuildCall = !!(
+      toolChoice &&
+      toolChoice !== 'auto' &&
+      typeof toolChoice === 'object' &&
+      toolChoice.function &&
+      toolChoice.function.name === 'replace_spec'
+    );
+    let first;
+    try {
+      first = await originalStreamChat(messages, tools, onState, signal, toolChoice);
+    } catch (error) {
+      if (!isBuildCall || isAbort(error) || !/tool_choice|tool call|function call|unsupported|not supported/i.test(String(error && error.message || error))) {
+        throw error;
+      }
+      const recovered = await retryWithOnlyBuildTool(messages, tools, onState, signal, 'replace_spec');
+      if (recovered && recovered.toolCalls && recovered.toolCalls.length) return recovered;
+      throw error;
+    }
+
+    if (!isBuildCall || (first.toolCalls && first.toolCalls.length) || isSafetyRefusal(first)) return first;
+
+    const recovered = await retryWithOnlyBuildTool(messages, tools, onState, signal, 'replace_spec');
+    if (recovered && recovered.toolCalls && recovered.toolCalls.length) return recovered;
+    if (recovered && (recovered.content || recovered.refusal)) return recovered;
+    return first;
+  };
+  recoveredStreamChat.__aivaRecoveryInstalled = true;
+  window.streamChat = recoveredStreamChat;
+})();
