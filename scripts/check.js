@@ -46,7 +46,7 @@ const agentTools = fs.readFileSync(path.join(root, 'src', 'agent', 'tools.js'),'
 const agentSession = fs.readFileSync(path.join(root, 'src', 'agent', 'session-and-skills.js'),'utf8');
 if (!modelStream.includes('async function buildVideoWithRecovery') || !modelStream.includes("choice: 'required'")) throw new Error('Video build recovery must live in the model transport and request required tool calls.');
 if (settingsController.includes('installToolCallRecovery')) throw new Error('Model recovery must not be owned by the Settings UI.');
-if (!modelStream.includes('responseFormat: { type: \'json_object\' }') || !modelStream.includes('validBuildSpec')) throw new Error('JSON-output fallback and video spec validation are missing.');
+if (!modelStream.includes('responseFormat: { type: \'json_object\' }') || !modelStream.includes('validVideoBuildSpec')) throw new Error('JSON-output fallback and video spec validation are missing.');
 if (!agentLoop.includes('buildVideoWithRecovery(messages, tools')) throw new Error('The agent loop does not call the first-class video build recovery.');
 if (!agentLoop.includes("newVideoBuild ? 'off'")) throw new Error('New video builds must start with thinking disabled.');
 if (!agentTools.includes('maximum 40 scenes per build') || !agentTools.includes('minItems: 1')) throw new Error('replace_spec payload validation/schema is incomplete.');
