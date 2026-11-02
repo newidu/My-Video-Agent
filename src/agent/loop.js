@@ -136,7 +136,7 @@ async function runAgent(userText) {
   const bubble = beginBotBubble();
   const newVideoBuild = SPEC.scenes.length === 0 && wantsVideo(userText);
   const allTools = $('useTools').checked ? toolSchema() : null;
-  const buildToolNames = new Set(['replace_spec', 'get_project', 'read_skill', 'list_skill_files', 'verify_video', 'set_style', 'todo_write', 'find_tools', 'set_music', 'beat_map', 'sfx', 'critique', 'audit', 'grab_frame']);
+  const buildToolNames = new Set(['replace_spec', 'get_project', 'read_skill', 'list_skill_files', 'verify_video', 'set_style', 'todo_write', 'find_tools', 'set_music', 'beat_map', 'sfx', 'critique', 'audit', 'grab_frame', 'apply_ops', 'add_element', 'set_text', 'remove_element', 'find_elements', 'check_code', 'snapshot', 'restore_snapshot', 'undo', 'redo', 'set_playhead', 'list_fonts', 'set_font', 'media_info', 'count_frames', 'export_video', 'export_poster']);
   const tools = allTools ? (newVideoBuild ? allTools.filter(tool => buildToolNames.has(tool.function.name)) : allTools) : null;
   let messages = [{ role: 'system', content: systemPrompt() }]
     .concat(CHAT.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10).map(m => ({ role: m.role, content: m.content })));
