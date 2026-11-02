@@ -341,6 +341,31 @@
     setStorage('aiva_show_beat_grid',grid.checked?'1':'0');
   });
 
+  /* Persist and apply export bitrate to the editor's existing MediaRecorder export path. */
+  const bitrate = $('settingExportBitrate');
+  bitrate.value = getStorage('aiva_export_bitrate') || '9000000';
+  window.AIVA_EXPORT_SETTINGS = { videoBitsPerSecond: Number(bitrate.value) || 9000000 };
+  bitrate.addEventListener('change',() => {
+    window.AIVA_EXPORT_SETTINGS.videoBitsPerSecond = Number(bitrate.value) || 9000000;
+    setStorage('aiva_export_bitrate',bitrate.value);
+  });
+  if (window.MediaRecorder && !window.MediaRecorder.__aivaWrapped) {
+    const NativeRecorder = window.MediaRecorder;
+    const RecorderProxy = new Proxy(NativeRecorder,{
+      construct(target,args,newTarget) {
+        const options = Object.assign({},args[1] || {});
+        options.videoBitsPerSecond = window.AIVA_EXPORT_SETTINGS.videoBitsPerSecond || 9000000;
+        return Reflect.construct(target,[args[0],options],newTarget);
+      },
+      get(target,property) {
+        const value = Reflect.get(target,property,target);
+        return typeof value === 'function' && property === 'isTypeSupported' ? value.bind(target) : value;
+      }
+    });
+    try { Object.defineProperty(RecorderProxy,'__aivaWrapped',{value:true}); } catch (e) {}
+    window.MediaRecorder = RecorderProxy;
+  }
+
   /* Keep the provider model-routing preference scoped to DeepSeek only. */
   $('modelRoute').addEventListener('change',() => setStorage('aiva_route_preference',$('modelRoute').checked?'1':'0'));
 
