@@ -187,7 +187,11 @@ async function sendPrompt() {
   if (BUSY) return;
   const text = $('prompt').value.trim();
   if (!text) { agentStatus('Type what you want first.'); return; }
-  if (!apiKey()) { agentStatus('Paste your DeepSeek API key (sk-…) above and press Save.'); return; }
+  if (!apiKey()) { agentStatus('Add an API key for the selected provider in Settings → Providers & models.'); return; }
+  if (SPEC.scenes.length === 0 && wantsVideo(text) && !$('useTools').checked) {
+    agentStatus('Turn on “Agent tools and action loop” in Settings → Agent to build videos.');
+    return;
+  }
   pushMsg('user', text);
   $('prompt').value = '';
   BUSY = true; $('btnSend').disabled = true; $('btnStop').disabled = false;
