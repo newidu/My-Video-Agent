@@ -341,8 +341,8 @@ const TOOL_IMPL = {
       const scene = args.spec.scenes[i];
       if (!scene || typeof scene !== 'object') return 'invalid spec: scene ' + (i + 1) + ' is not an object';
       if (!Number.isFinite(Number(scene.dur)) || Number(scene.dur) <= 0) return 'invalid spec: scene ' + (i + 1) + ' needs a positive numeric dur';
-      if (scene.elements !== undefined && !Array.isArray(scene.elements)) return 'invalid spec: scene ' + (i + 1) + ' elements must be an array';
-      if (Array.isArray(scene.elements) && scene.elements.length > 40) return 'invalid spec: maximum 40 elements per scene';
+      if (!Array.isArray(scene.elements) || !scene.elements.length) return 'invalid spec: scene ' + (i + 1) + ' needs at least one text or code element';
+      if (scene.elements.length > 40) return 'invalid spec: maximum 40 elements per scene';
       if (Array.isArray(scene.elements) && scene.elements.some(el => !el || !['text', 'code'].includes(el.type))) {
         return 'invalid spec: scene ' + (i + 1) + ' contains an unsupported element type; use text or code';
       }
@@ -594,6 +594,7 @@ function toolSchema() {
                         js: { type: 'string', description: 'Optional deterministic scene background drawing code.' },
                         elements: {
                           type: 'array',
+                          minItems: 1,
                           maxItems: 40,
                           items: {
                             type: 'object',
