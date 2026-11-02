@@ -134,7 +134,8 @@ async function runAgent(userText) {
         } else {
           cur.body.textContent = window.__LAST_TOOL_CALL_DIAGNOSTIC || 'The model did not return the replace_spec tool call. Check that the selected model supports tool calling.';
         }
-        if (built) finalText = '';
+        if (built) finalText = ''; else finalText = cur.body.textContent;
+        if (!built) break;
         continue;
       }
       break;
