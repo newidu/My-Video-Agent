@@ -469,3 +469,22 @@ input[type="range"] { accent-color: var(--accent); }
 .inspector-header { min-height:48px; }
 .inspector-section { padding-bottom:3px; }
 #itemBox > p, #elList > p, #itemList > p { display:none; }
+
+
+/* Visible, copyable diagnostic log — clipboard is optional, not the only way to retrieve it. */
+.debug-panel {
+  flex:none; margin:0 12px 10px; padding:10px;
+  border:1px solid #625448; border-radius:9px; background:#232320;
+}
+.debug-panel[hidden] { display:none; }
+.debug-panel-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:7px; }
+.debug-panel-head strong { color:#e4d9cc; font-size:10px; }
+.debug-panel-actions { display:flex; flex-wrap:wrap; gap:5px; }
+.debug-panel-actions button { padding:4px 7px; font-size:9px; }
+#debugOutput {
+  display:block; width:100%; min-height:125px; max-height:230px; resize:vertical;
+  padding:8px; border:1px solid #4a4942; border-radius:6px;
+  background:#181817; color:#ddd8ce; font:10px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;
+  white-space:pre; overflow:auto; user-select:text;
+}
+#debugCopyStatus { margin:6px 0 0; color:#a9a49a; font-size:9px; }
