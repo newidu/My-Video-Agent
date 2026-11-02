@@ -5,15 +5,17 @@
 const MODEL_ROUTE_STORE = 'aiva_route';
 const ROUTE_CHEAP = 'deepseek-v4-flash';
 function cheapModel(picked) { return /pro|reasoner|opus|sonnet|gpt-5|large/.test(String(picked || '')) ? ROUTE_CHEAP : null; }
-async function streamChat(messages, tools, onState, signal, toolChoice) {
+async function streamChat(messages, tools, onState, signal, toolChoice, requestOptions) {
+  requestOptions = requestOptions || {};
   const picked = $('model').value;
   const model = (window.MODEL_OVERRIDE && $('modelRoute') && $('modelRoute').checked) ? window.MODEL_OVERRIDE : picked;
-  const body = { model, messages, stream: true, stream_options: { include_usage: true }, temperature: 0.6 };
+  const body = { model: requestOptions.model || model, messages, stream: true, stream_options: { include_usage: true }, temperature: requestOptions.temperature === undefined ? 0.6 : requestOptions.temperature, max_tokens: requestOptions.maxTokens || 6000 };
+  if (requestOptions.responseFormat) body.response_format = requestOptions.responseFormat;
   const forced = !!(toolChoice && toolChoice !== 'auto');
   if (tools && tools.length) { body.tools = tools; body.tool_choice = toolChoice || 'auto'; }
   /* keep the answer short: a step that only calls tools does not need an essay */
   if (!body.max_tokens) body.max_tokens = 2400;
-  const think = window.THINK_OVERRIDE || $('thinking').value;
+  const think = requestOptions.thinking || window.THINK_OVERRIDE || $('thinking').value;
   if (think === 'on') body.thinking = { type: 'enabled' };
   if (think === 'off') body.thinking = { type: 'disabled' };
   /* auto-heal: once a model has refused thinking once, stop asking it for the rest of the run */
@@ -58,13 +60,15 @@ async function streamChat(messages, tools, onState, signal, toolChoice) {
       throw new Error('API ' + res.status + ': ' + redact(txt.slice(0, 300)) + hint);
     }
   }
-  const acc = { content: '', reasoning: '', toolCalls: [], usage: null };
+  const acc = { content: '', reasoning: '', toolCalls: [], usage: null, finishReason: '', refusal: '' };
   if (!res.body) {                                  // no streaming -> plain JSON
     const j = JSON.parse(await res.text());
     const m = j.choices[0].message;
-    acc.content = m.content || '';
-    acc.reasoning = m.reasoning_content || '';
+    acc.content = typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map(p => p && (p.text || '')).join('\\n') : '';
+    acc.reasoning = m.reasoning_content || m.reasoning || '';
+    acc.refusal = m.refusal || '';
     acc.toolCalls = m.tool_calls || [];
+    acc.finishReason = j.choices[0].finish_reason || '';
     acc.usage = j.usage;
     onState(acc);
     return acc;
@@ -88,9 +92,11 @@ async function streamChat(messages, tools, onState, signal, toolChoice) {
       if (j.usage) { acc.usage = j.usage; onState(acc); }
       const ch = j.choices && j.choices[0];
       if (!ch) continue;
-      const d = ch.delta || {};
-      if (d.reasoning_content) acc.reasoning += d.reasoning_content;
-      if (d.content) acc.content += d.content;
+      const d = ch.delta || ch.message || {};
+      if (d.reasoning_content || d.reasoning) acc.reasoning += d.reasoning_content || d.reasoning;
+      if (d.content !== undefined) acc.content += typeof d.content === 'string' ? d.content : Array.isArray(d.content) ? d.content.map(p => p && (p.text || '')).join('\\n') : '';
+      if (d.refusal) acc.refusal += d.refusal;
+      if (ch.finish_reason) acc.finishReason = ch.finish_reason;
       if (d.tool_calls) {
         d.tool_calls.forEach((tc, k) => {
           const idx = (tc.index === undefined) ? k : tc.index;
@@ -107,6 +113,29 @@ async function streamChat(messages, tools, onState, signal, toolChoice) {
     }
   }
   acc.toolCalls = acc.toolCalls.filter(Boolean);
+  if (buf.trim() && buf.trim().startsWith('data:')) {
+    const tail = buf.trim().slice(5).trim();
+    if (tail && tail !== '[DONE]') {
+      try {
+        const event = JSON.parse(tail);
+        if (event.usage) acc.usage = event.usage;
+        const choice = event.choices && event.choices[0];
+        if (choice) {
+          const delta = choice.delta || choice.message || {};
+          if (delta.content) acc.content += delta.content;
+          if (delta.refusal) acc.refusal += delta.refusal;
+          if (delta.tool_calls) delta.tool_calls.forEach((tc, k) => {
+            const ix = tc.index === undefined ? k : tc.index;
+            const slot = acc.toolCalls[ix] || (acc.toolCalls[ix] = { id: '', type: 'function', function: { name: '', arguments: '' } });
+            if (tc.id) slot.id = tc.id;
+            if (tc.function && tc.function.name) slot.function.name = tc.function.name;
+            if (tc.function && tc.function.arguments) slot.function.arguments += tc.function.arguments;
+          });
+          if (choice.finish_reason) acc.finishReason = choice.finish_reason;
+        }
+      } catch (e) {}
+    }
+  }
   return acc;
 }
 
