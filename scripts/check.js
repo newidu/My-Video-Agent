@@ -48,6 +48,11 @@ if (!modelStream.includes('async function buildVideoWithRecovery') || !modelStre
 if (settingsController.includes('installToolCallRecovery')) throw new Error('Model recovery must not be owned by the Settings UI.');
 if (!modelStream.includes('responseFormat: { type: \'json_object\' }') || !modelStream.includes('validVideoBuildSpec')) throw new Error('JSON-output fallback and video spec validation are missing.');
 if (!agentLoop.includes('buildVideoWithRecovery(messages, tools')) throw new Error('The agent loop does not call the first-class video build recovery.');
+const runAgentStart = agentLoop.indexOf('async function runAgent');
+const firstRecoveryCall = agentLoop.indexOf('buildVideoWithRecovery(messages, tools', runAgentStart);
+const normalLoopStart = agentLoop.indexOf('for (let step =', runAgentStart);
+if (firstRecoveryCall < 0 || normalLoopStart < 0 || firstRecoveryCall > normalLoopStart) throw new Error('A new empty-stage video must call replace_spec recovery before the normal chat/tool loop.');
+if (agentLoop.includes('Nothing is on the stage yet — forcing the build.')) throw new Error('The old empty-stage forced-build path is still present.');
 if (!agentLoop.includes("newVideoBuild ? 'off'")) throw new Error('New video builds must start with thinking disabled.');
 if (!agentTools.includes('maximum 40 scenes per build') || !agentTools.includes('minItems: 1')) throw new Error('replace_spec payload validation/schema is incomplete.');
 if (!agentSession.includes('NEW VIDEO FIRST') || agentSession.includes('1. PLAN FIRST.')) throw new Error('System prompt still contains conflicting first-action instructions.');
