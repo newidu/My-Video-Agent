@@ -44,9 +44,18 @@ async function execToolCalls(acc, cur, messages) {
 
 async function runAgent(userText) {
   const bubble = beginBotBubble();
-  const tools = $('useTools').checked ? toolSchema() : null;
+  const newVideoBuild = SPEC.scenes.length === 0 && wantsVideo(userText);
+  const allTools = $('useTools').checked ? toolSchema() : null;
+  const buildToolNames = new Set(['replace_spec', 'get_project', 'read_skill', 'list_skill_files', 'verify_video', 'set_style', 'todo_write', 'find_tools', 'set_music', 'beat_map', 'sfx', 'critique', 'audit', 'grab_frame']);
+  const tools = allTools ? (newVideoBuild ? allTools.filter(tool => buildToolNames.has(tool.function.name)) : allTools) : null;
   const messages = [{ role: 'system', content: systemPrompt() }]
     .concat(CHAT.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10).map(m => ({ role: m.role, content: m.content })));
+  if (newVideoBuild) {
+    messages.push({
+      role: 'system',
+      content: 'NEW VIDEO BUILD MODE: the canvas is empty. Your FIRST tool call MUST be replace_spec with a complete valid video spec. Do not call todo_write or read_skill before the first build. Build first, then verify_video, read relevant skills and refine. Do not answer with a plan.'
+    });
+  }
   messages.push({ role: 'user', content: userText });
 
   let cur = beginStep(bubble);
@@ -74,7 +83,7 @@ async function runAgent(userText) {
       const wire = reminder ? messages.concat([{ role: 'system', content: reminder }]) : messages;
       /* thinking is the expensive part of a step: let the model plan once, then
          run the mechanical tool steps without it */
-      window.THINK_OVERRIDE = $('thinking').value === 'auto' ? (step === 0 ? 'on' : 'off') : null;
+      window.THINK_OVERRIDE = newVideoBuild ? 'off' : ($('thinking').value === 'auto' ? (step === 0 ? 'on' : 'off') : null);
       /* step 0 plans on the picked model; routine tool steps are routed down */
       window.MODEL_OVERRIDE = step === 0 ? null : cheapModel($('model').value);
       const acc = await streamChat(wire, tools, render, ABORT.signal);
@@ -105,36 +114,43 @@ async function runAgent(userText) {
 
       finalText = acc.content || '';
       const asJson = tryJson(finalText);
-      if (asJson && (asJson.spec || asJson.ops || asJson.action)) {
+      if (asJson && (asJson.spec || Array.isArray(asJson.scenes) || asJson.ops || asJson.action)) {
         if (asJson.say) cur.body.textContent = asJson.say;
-        applyAgentResult(asJson);
-        finalText = asJson.say || '(updated the video)';
+        if (asJson.spec || Array.isArray(asJson.scenes)) {
+          const directSpec = asJson.spec || asJson;
+          if (typeof validVideoBuildSpec === 'function' && validVideoBuildSpec(directSpec)) {
+            applyAgentResult({ action: 'replace', spec: directSpec, say: asJson.say || '' });
+            finalText = asJson.say || '(video built from structured JSON)';
+          } else {
+            cur.body.textContent = 'The model returned JSON, but it is not a valid video spec. A spec must contain at least one scene with a duration and text/code elements.';
+            finalText = cur.body.textContent;
+            break;
+          }
+        } else {
+          applyAgentResult(asJson);
+          finalText = asJson.say || '(updated the video)';
+        }
         built = SPEC.scenes.length > 0;
         break;
       }
 
-      /* the model described a video instead of building one — force the build, then keep looping */
-      if (tools && !built && wantsVideo(userText)) {
+      /* Recover a new-video request through required tools and JSON output modes. */
+      if (newVideoBuild && !built && tools) {
         cur = beginStep(bubble);
-        cur.body.textContent = 'Nothing is on the stage yet — forcing the build.';
-        messages.push({
-          role: 'user',
-          content: 'The stage is STILL EMPTY: no scenes exist. Stop explaining and call replace_spec right now with the complete spec for the video I asked for.'
-        });
-        $('stepInfo').textContent = 'forcing the build · step ' + (step + 1);
-        const forced = await streamChat(messages, tools, render, ABORT.signal,
-          { type: 'function', function: { name: 'replace_spec' } });
-        addUsage(forced.usage);
-        if (forced.toolCalls && forced.toolCalls.length) {
+        cur.body.textContent = 'Building the video…';
+        $('stepInfo').textContent = 'building video · recovering tool call';
+        const forced = await buildVideoWithRecovery(messages, tools, render, ABORT.signal, userText);
+        addUsage(forced && forced.usage);
+        if (forced && forced.toolCalls && forced.toolCalls.length) {
           await execToolCalls(forced, cur, messages);
           built = SPEC.scenes.length > 0;
           cur.body.textContent = built
             ? 'Built ' + SPEC.scenes.length + ' scene' + (SPEC.scenes.length === 1 ? '' : 's') + ' · ' + DUR.toFixed(1) + 's.'
-            : 'Still nothing was built — see the tool result above.';
+            : 'The video spec was received, but the editor could not create any scenes. Check the tool result above.';
         } else {
-          cur.body.textContent = window.__LAST_TOOL_CALL_DIAGNOSTIC || 'The model did not return the replace_spec tool call. Check that the selected model supports tool calling.';
+          cur.body.textContent = window.__LAST_TOOL_CALL_DIAGNOSTIC || 'The provider did not return a valid video spec.';
         }
-        if (built) finalText = ''; else finalText = cur.body.textContent;
+        finalText = built ? '' : cur.body.textContent;
         if (!built) break;
         continue;
       }
