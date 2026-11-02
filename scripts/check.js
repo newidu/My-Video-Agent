@@ -39,6 +39,12 @@ for (const id of ['formatSel','btnLetter','btnMusicOn','btnFont','btnRestart']) 
  if (!legacyControls[1].includes('id="' + id + '"')) throw new Error('Editor preference control must be hidden and managed in Settings: ' + id);
 }
 if (html.includes('id="btnOpenSkills"') || html.includes('id="btnMusic"')) throw new Error('A Settings-only shortcut is still visible in the editor.');
+const settingsController = fs.readFileSync(path.join(root, 'ui', 'redesign', 'settings.js'),'utf8');
+if (!settingsController.includes('installToolCallRecovery') || !settingsController.includes("signal, 'required'")) throw new Error('Missing required-tool recovery for replace_spec.');
+if (!settingsController.includes('__LAST_TOOL_CALL_DIAGNOSTIC')) throw new Error('Missing actionable tool-call failure diagnostics.');
+const agentLoop = fs.readFileSync(path.join(root, 'src', 'agent', 'loop.js'),'utf8');
+if (!agentLoop.includes('if (!built) break;')) throw new Error('Agent must stop cleanly after an unrecovered build tool call.');
+
 if (html.includes('project-tile') || html.includes('Untitled project')) throw new Error('Static project placeholder remains in the editor sidebar.');
 if (html.includes('class="preview-toolbar"')) throw new Error('Redundant preview heading remains above the canvas.');
 if (html.includes('id="btnRestart" class="subtle-button"')) throw new Error('Duplicate restart action remains in the top toolbar.');
@@ -62,8 +68,8 @@ const sections = [
  [971,1966,'src/editor/interaction.js'], [1967,2018,'src/features/fonts.js'],
  [2019,2527,'src/features/audio-music.js'], [2528,2920,'src/editor/history-and-audit.js'],
  [2921,3368,'src/agent/session-and-skills.js'], [3369,3951,'src/agent/tools.js'],
- [3952,4189,'src/agent/model-streaming-context.js'], [4190,4373,'src/agent/loop.js'],
- [4374,4525,'src/agent/spec-bridge-and-boot.js']
+ [3952,4189,'src/agent/model-streaming-context.js'], [4190,4374,'src/agent/loop.js'],
+ [4375,4526,'src/agent/spec-bridge-and-boot.js']
 ];
 const sourceLines = source.split(/\r?\n/);
 for (const [start,end,file] of sections) {
