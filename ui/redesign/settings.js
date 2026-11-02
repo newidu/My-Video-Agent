@@ -32,6 +32,7 @@
   const memKeys = Object.create(null);
   let activeProvider = 'deepseek';
   let startupReady = false;
+  let thinkingEnabled = false;
   const nativeFetch = window.fetch.bind(window);
 
   function profileKey(id, suffix) { return PREFIX + id + '_' + suffix; }
@@ -121,6 +122,21 @@
       thinking.disabled = activeProvider !== 'deepseek';
       thinking.title = activeProvider === 'deepseek' ? 'DeepSeek extended-thinking request option' : 'Extended thinking is currently provider-specific to DeepSeek.';
     }
+    syncThinkingToggle();
+  }
+
+  function syncThinkingToggle() {
+    const button = $('btnThinkingToggle');
+    if (!button) return;
+    const label = $('thinkingToggleState');
+    const supported = activeProvider === 'deepseek';
+    button.disabled = !supported;
+    button.setAttribute('aria-pressed', thinkingEnabled ? 'true' : 'false');
+    button.classList.toggle('is-on', thinkingEnabled);
+    if (label) label.textContent = thinkingEnabled ? 'ON' : 'OFF';
+    button.title = supported
+      ? 'Extended thinking is ' + (thinkingEnabled ? 'ON' : 'OFF') + '. Click to switch it ' + (thinkingEnabled ? 'off' : 'on') + '.'
+      : 'Thinking toggle is currently supported only by the DeepSeek provider.';
   }
 
   /* Reuse the existing credential object so the original Save/Forget controls and
@@ -183,10 +199,15 @@
   window.fetch = (input, init) => {
     try {
       const url = typeof input === 'string' ? input : (input && input.url) || '';
-      if (init && init.body && /\/chat\/completions(?:\?|$)/.test(url) && activeProvider !== 'deepseek') {
+      if (init && init.body && /\/chat\/completions(?:\?|$)/.test(url)) {
         const body = JSON.parse(init.body);
-        delete body.thinking;
-        delete body.stream_options;
+        if (activeProvider === 'deepseek') {
+          const forcedToolCall = !!(body.tool_choice && body.tool_choice !== 'auto');
+          body.thinking = { type: thinkingEnabled && !forcedToolCall ? 'enabled' : 'disabled' };
+        } else {
+          delete body.thinking;
+          delete body.stream_options;
+        }
         init = Object.assign({},init,{body:JSON.stringify(body)});
       }
     } catch (e) {}
@@ -232,6 +253,19 @@
     document.body.classList.remove('settings-open');
     const opener = $('btnOpenSettings');
     if (opener) opener.focus({ preventScroll: true });
+  }
+
+  const thinkingPreference = getStorage('aiva_composer_thinking');
+  thinkingEnabled = thinkingPreference === '1';
+  const thinkingToggle = $('btnThinkingToggle');
+  if (thinkingToggle) {
+    thinkingToggle.addEventListener('click',() => {
+      if (activeProvider !== 'deepseek') return;
+      thinkingEnabled = !thinkingEnabled;
+      setStorage('aiva_composer_thinking',thinkingEnabled ? '1' : '0');
+      syncThinkingToggle();
+    });
+    syncThinkingToggle();
   }
 
   $('providerPreset').addEventListener('change',() => {
