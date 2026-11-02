@@ -538,7 +538,10 @@
 
   async function retryWithOnlyBuildTool(messages, tools, onState, signal, name) {
     const tool = (tools || []).find(t => t && t.function && t.function.name === name);
-    if (!tool) return null;
+    if (!tool) {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The active agent tool list does not contain replace_spec. Turn on Agent tools in Settings and try again.';
+      return null;
+    }
     const retryMessages = buildRetryMessages(messages);
     const oldThinking = window.THINK_OVERRIDE;
     const oldModel = window.MODEL_OVERRIDE;
@@ -561,6 +564,19 @@
         window.STEP_NOTE = 'build tool recovered after a no-tool-call response';
         return result;
       }
+      if (!isSafetyRefusal(result)) {
+        const explicitChoice = { type: 'function', function: { name } };
+        const explicit = await originalStreamChat(retryMessages, [tool], onState, signal, explicitChoice);
+        if (explicit && explicit.toolCalls && explicit.toolCalls.length) {
+          window.STEP_NOTE = 'build tool recovered with a single-tool function choice';
+          return explicit;
+        }
+        if (isSafetyRefusal(explicit)) {
+          window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The model returned a safety refusal: ' + String(explicit.content || explicit.refusal || '').slice(0, 260);
+          return explicit;
+        }
+        result = explicit || result;
+      }
 
       /* Some compatible endpoints serialize the requested arguments as JSON
          content instead of returning a standard tool_calls delta. Accept only
@@ -578,6 +594,13 @@
           window.STEP_NOTE = 'video spec recovered from the provider JSON response';
           return result;
         }
+      }
+      if (isSafetyRefusal(result)) {
+        window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The model returned a safety refusal: ' + String(result.content || result.refusal || '').slice(0, 260);
+      } else {
+        window.__LAST_TOOL_CALL_DIAGNOSTIC =
+          'The selected provider/model did not return the replace_spec tool call. Check that this model supports function calling, then try a tool-capable model such as DeepSeek V4 Flash or another supported chat-completions model.'
+          + (result && result.content ? ' Model response: ' + String(result.content).slice(0, 180) : '');
       }
       return result;
     } finally {
@@ -606,8 +629,13 @@
       throw error;
     }
 
-    if (!isBuildCall || (first.toolCalls && first.toolCalls.length) || isSafetyRefusal(first)) return first;
+    if (!isBuildCall || (first.toolCalls && first.toolCalls.length)) return first;
+    if (isSafetyRefusal(first)) {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The model returned a safety refusal: ' + String(first.content || first.refusal || '').slice(0, 260);
+      return first;
+    }
 
+    window.__LAST_TOOL_CALL_DIAGNOSTIC = '';
     const recovered = await retryWithOnlyBuildTool(messages, tools, onState, signal, 'replace_spec');
     if (recovered && recovered.toolCalls && recovered.toolCalls.length) return recovered;
     if (recovered && (recovered.content || recovered.refusal)) return recovered;
