@@ -347,7 +347,7 @@ function systemPrompt() {
     '',
     ...(SKILL_INDEX_ONLY && !SKILL_ALL
       ? ['The SKILL PACK is indexed below (file, one-line summary, size) — it is the human\'s own playbook, kept verbatim. Open the two or three files that match this brief with read_skill({path}) BEFORE you design; the index is a menu, not the manual. Follow its workflow, story rules, motion-graphics guidance and verification habits. Your only departure is that you cannot call FFmpeg or image/video models here — you drive the deterministic canvas engine described next, and you have the tools listed after it.']
-      : ['Below is the SKILL PACK in full, verbatim, exactly as the human wrote it. For a new empty project, create the first complete video with replace_spec immediately, then follow relevant skill workflows to refine and verify it. For edits to an existing project, follow relevant skills before changing it. Your only departure is that you cannot call FFmpeg or image/video models here — you drive the deterministic canvas engine described second.']),
+      : ['Below is the SKILL PACK in full, verbatim, exactly as the human wrote it. For every creation or editing task, read the relevant skill files first, create a todo plan, then execute and verify the work. Do not skip preflight just because the canvas is empty. Your only departure is that you cannot call FFmpeg or image/video models here — you drive the deterministic canvas engine described second.']),
     '',
     SKILL_INDEX_ONLY && !SKILL_ALL ? '===================== SKILL PACK INDEX =====================' : '===================== SKILL PACK (verbatim) =====================',
     skillText(),
@@ -390,10 +390,10 @@ function systemPrompt() {
     '',
     '===================== HOW YOU WORK =====================',
     'You are not a chatbot that describes videos; you are an agent that builds them. Keep going until the job is done — never stop after a plan, never ask permission to do the obvious next step.',
-    '1. NEW VIDEO FIRST. When the project is empty and the human asks for a video, the first tool call MUST be replace_spec with the complete first-pass video. Do not call todo_write or read_skill before this first build. After the first pass, verify it, read relevant skills and refine; use todo_write for the remaining multi-step work.',
+    '1. TASK PREFLIGHT. For every multi-step creation or editing task, first read the relevant skill files with read_skill and create/update the visible todo list with todo_write. This is mandatory even when the canvas is empty. Only after preflight, build or edit. Keep todo statuses accurate after every major step.',
     '2. READ BEFORE YOU REWRITE. Before you modify an existing element (set_text, apply_ops, remove_element) call get_project() first; the tools refuse edits made on a stale picture. New work (replace_spec, add_element) needs no read.',
     '3. BATCH. Independent tool calls go in the SAME turn (e.g. three add_element calls, or get_project + verify_video). Do not spend a turn per call.',
-    '4. VERIFY AFTER EVERY CHANGE. verify_video() for structure and blank frames, grab_frame({time}) when you need the real pixel statistics, and the tool result already reports code errors for the frame. Fix what the report says before moving on.',
+    '4. VERIFY AFTER EVERY CHANGE. verify_video() for structure and blank frames, grab_frame({time}) when you need the real pixel statistics, and the tool result already reports code errors for the frame. Fix every reported issue, then run verify_video() again before delivery.',
     '5. REVIEW BEFORE DELIVERY. Call critique() once the video is built, act on the bullets that matter, then export_video() if the human asked for the file.',
     '6. TOOL RESULTS ARE BUDGETED. Old results are cleared and long ones truncated; if you need a fact again, call the tool again instead of assuming. Keep your own writing short and concrete.',
     '7. NEVER GUESS IDS. find_elements({q}) searches texts, labels, types and code. Ids are "<sceneId>.e<index>".',

@@ -64,7 +64,12 @@ if (firstRecoveryCall < 0 || normalLoopStart < 0 || firstRecoveryCall > normalLo
 if (agentLoop.includes('Nothing is on the stage yet — forcing the build.')) throw new Error('The old empty-stage forced-build path is still present.');
 if (!agentLoop.includes("newVideoBuild ? 'off'")) throw new Error('New video builds must start with thinking disabled.');
 if (!agentTools.includes('maximum 40 scenes per build') || !agentTools.includes('minItems: 1')) throw new Error('replace_spec payload validation/schema is incomplete.');
-if (!agentSession.includes('NEW VIDEO FIRST') || agentSession.includes('1. PLAN FIRST.')) throw new Error('System prompt still contains conflicting first-action instructions.');
+if (!agentSession.includes('TASK PREFLIGHT') || agentSession.includes('Do not call todo_write or read_skill before this first build')) throw new Error('System prompt must require skill and todo preflight before building.');
+if (!agentLoop.includes('runAgentPreflight') || !agentLoop.includes('MAX_AGENT_STEPS') || agentLoop.includes('SAFE_CAP = 999')) throw new Error('Agent preflight and bounded loop guard are missing.');
+if (!agentTools.includes('read-once policy') && agentTools.includes('repeat read —')) throw new Error('Skill files must be readable again on later tasks.');
+if (!agentLoop.includes('const reportText = TOOL_IMPL.verify_video({})')) throw new Error('A completed task must be verified before the agent stops.');
+if (!agentLoop.includes("'apply_ops', 'add_element', 'set_text', 'remove_element'")) throw new Error('A first-build agent must retain edit tools for post-build refinement.');
+if (!modelStream.includes('TODO_EL.parentNode !== host')) throw new Error('The live Todo panel must move into the current agent bubble on every new turn.');
 
 if (html.includes('project-tile') || html.includes('Untitled project')) throw new Error('Static project placeholder remains in the editor sidebar.');
 if (html.includes('class="preview-toolbar"')) throw new Error('Redundant preview heading remains above the canvas.');

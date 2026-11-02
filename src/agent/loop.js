@@ -1,8 +1,8 @@
 /* Video agent execution loop and first-build orchestration. Section boundaries are validated against original/source.html by scripts/check.js. */
 /* ---------- the agent loop ---------- */
-/* no step limit: the loop runs until the model stops calling tools (Stop button always works).
-   SAFE_CAP only exists so a broken stream can never spin forever — it is far above any real run. */
-const SAFE_CAP = 999;
+/* Bounded agent loop: a broken model cannot consume hundreds of requests by
+   alternating repeated tool calls. The user can still stop any active request. */
+const MAX_AGENT_STEPS = 32;
 /* Distinguish an actual creation/edit brief from a question about existing footage.
    Do not let a question mark inside a build brief disable the build path. */
 function wantsVideo(text) {
@@ -13,6 +13,85 @@ function wantsVideo(text) {
   const startsAsQuestion = /^(?:what|why|how|who|which|explain|tell me|read|count|describe)\b/i.test(value);
   const asksAboutFootage = /\b(video|clip|footage|reel|short|promo|trailer|explainer|intro)\b/i.test(value);
   return !startsAsQuestion && asksAboutFootage && !/\?\s*$/.test(value);
+}
+
+
+/* Deterministic task preflight: load actual skill text and create the visible
+   todo list before the first build/edit request, rather than trusting the model
+   to remember that the skill index is only an index. */
+function selectTaskSkills(userText) {
+  const q = String(userText || '').toLowerCase();
+  const paths = ['video-generation/SKILL.md'];
+  const add = path => { if (SKILL_FILES[path] && !paths.includes(path)) paths.push(path); };
+  if (/ugc|influencer|creator|product demo|unboxing/.test(q)) add('video-generation/workflows/ugc-video.md');
+  else if (/talking.?head|interview|presenter|face.?cam/.test(q)) add('video-generation/workflows/talking-head.md');
+  else if (/slide|presentation|pitch deck/.test(q)) add('video-generation/workflows/slides-to-video.md');
+  else if (/long.?form|long video|podcast|webinar|convert.*short|shorts from/.test(q)) add('video-generation/workflows/long-to-short.md');
+  else if (/product launch|launch video|advert|ad campaign|marketing/.test(q)) {
+    add('video-generation/workflows/product-launch.md');
+    add('video-generation/workflows/marketing-growth.md');
+  } else {
+    add('video-generation/workflows/creative-shorts/00-preflight.md');
+    add('video-generation/workflows/creative-shorts/01-concept-and-script.md');
+    add('video-generation/workflows/creative-shorts/03-shot-design.md');
+    add('video-generation/workflows/creative-shorts/05-editing.md');
+  }
+  if (/motion|kinetic|typography|animated text|title sequence|motion graphic/.test(q)) {
+    add('video-generation/workflows/motion-graphics.md');
+    add('video-generation/references/motion-graphics.md');
+  }
+  return paths.slice(0, 6);
+}
+function showDirectToolResult(host, name, args, result) {
+  const row = addToolRow(host, name, JSON.stringify(args || {}));
+  row.style.display = '';
+  const value = String(result === undefined ? '' : result);
+  row.textContent = '→ ' + (value.length > 1400 ? value.slice(0, 1400) + ' …' : value);
+}
+function updateAgentTodo(pattern, status, host) {
+  if (!Array.isArray(TODOS) || !TODOS.length) return;
+  const items = TODOS.map(item => ({ text: item.text, status: pattern.test(item.text) ? status : item.status }));
+  const result = TOOL_IMPL.todo_write({ items });
+  if (host) showDirectToolResult(host, 'todo_write', { items }, result);
+}
+function runAgentPreflight(userText, host, messages, isNewBuild) {
+  const plan = [
+    { text: 'Understand the brief and inspect the current project', status: 'completed' },
+    { text: 'Read the relevant skill files', status: 'in_progress' },
+    { text: isNewBuild ? 'Build the first complete video pass' : 'Apply the requested video changes', status: 'pending' },
+    { text: 'Verify all scenes and fix visual or code issues', status: 'pending' },
+    { text: 'Review the finished result and report completion', status: 'pending' }
+  ];
+  let result = TOOL_IMPL.todo_write({ items: plan });
+  showDirectToolResult(host, 'todo_write', { items: plan }, result);
+  const paths = selectTaskSkills(userText);
+  const loaded = [];
+  for (const path of paths) {
+    const content = TOOL_IMPL.read_skill({ path });
+    loaded.push({ path, content: String(content || '') });
+    showDirectToolResult(host, 'read_skill', { path }, content);
+  }
+  const readyPlan = plan.map((item, i) => ({
+    text: item.text,
+    status: i < 2 ? 'completed' : i === 2 ? 'in_progress' : 'pending'
+  }));
+  result = TOOL_IMPL.todo_write({ items: readyPlan });
+  showDirectToolResult(host, 'todo_write', { items: readyPlan }, result);
+  messages[0].content += '\n\n===================== SKILLS READ FOR THIS TASK =====================\n' +
+    loaded.map(item => '===== ' + item.path + ' =====\n' + item.content).join('\n\n') +
+    '\n===================== END TASK SKILLS =====================';
+  if (window.AIVA_DEBUG && window.AIVA_DEBUG.log) {
+    window.AIVA_DEBUG.log('agent_preflight', { skillPaths: paths, todoCount: readyPlan.length, newVideoBuild: !!isNewBuild });
+  }
+  return paths;
+}
+function verificationIssues(reportText) {
+  try {
+    const report = JSON.parse(String(reportText || ''));
+    return ['code_errors', 'blank_frames', 'low_contrast', 'off_frame', 'overlaps']
+      .filter(key => Array.isArray(report[key]) && report[key].length)
+      .map(key => key + ': ' + report[key].length);
+  } catch (e) { return ['verification report could not be parsed']; }
 }
 
 /* run every tool call of one assistant turn, streaming its result into the chat */
@@ -57,19 +136,20 @@ async function runAgent(userText) {
   const bubble = beginBotBubble();
   const newVideoBuild = SPEC.scenes.length === 0 && wantsVideo(userText);
   const allTools = $('useTools').checked ? toolSchema() : null;
-  const buildToolNames = new Set(['replace_spec', 'get_project', 'read_skill', 'list_skill_files', 'verify_video', 'set_style', 'todo_write', 'find_tools', 'set_music', 'beat_map', 'sfx', 'critique', 'audit', 'grab_frame']);
+  const buildToolNames = new Set(['replace_spec', 'get_project', 'read_skill', 'list_skill_files', 'verify_video', 'set_style', 'todo_write', 'find_tools', 'set_music', 'beat_map', 'sfx', 'critique', 'audit', 'grab_frame', 'apply_ops', 'add_element', 'set_text', 'remove_element', 'find_elements', 'check_code', 'snapshot', 'restore_snapshot', 'undo', 'redo', 'set_playhead', 'list_fonts', 'set_font', 'media_info', 'count_frames', 'export_video', 'export_poster']);
   const tools = allTools ? (newVideoBuild ? allTools.filter(tool => buildToolNames.has(tool.function.name)) : allTools) : null;
-  const messages = [{ role: 'system', content: systemPrompt() }]
+  let messages = [{ role: 'system', content: systemPrompt() }]
     .concat(CHAT.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10).map(m => ({ role: m.role, content: m.content })));
   if (newVideoBuild) {
     messages.push({
       role: 'system',
-      content: 'NEW VIDEO BUILD MODE: the canvas is empty. Your FIRST tool call MUST be replace_spec with a complete valid video spec. Do not call todo_write or read_skill before the first build. Build first, then verify_video, read relevant skills and refine. Do not answer with a plan.'
+      content: 'NEW VIDEO BUILD MODE: the canvas is empty. The task preflight has already created the todo list and loaded the relevant skill files. Now create a complete valid first-pass video with replace_spec, then verify it and refine until it passes.'
     });
   }
   messages.push({ role: 'user', content: userText });
 
   let cur = beginStep(bubble);
+  const taskRequiresAgentLoop = !!(tools && wantsVideo(userText));
   const render = acc => {
     if (acc.reasoning) {
       cur.think.style.display = '';
@@ -85,7 +165,12 @@ async function runAgent(userText) {
   let built = SPEC.scenes.length > 0;
   let lastPromptTokens = 0;
   try {
-    let lastSig = '', repeat = 0;
+    if (taskRequiresAgentLoop) runAgentPreflight(userText, cur.step, messages, newVideoBuild);
+    const signatureCounts = new Map();
+    let loopGuardHit = false;
+    let loopFinished = false;
+    let hasVerified = false;
+    let stepsExecuted = 0;
     let buildHandledBeforeLoop = false;
     let buildFailedBeforeLoop = false;
 
@@ -99,6 +184,10 @@ async function runAgent(userText) {
       if (firstBuild && firstBuild.toolCalls && firstBuild.toolCalls.length) {
         await execToolCalls(firstBuild, cur, messages);
         built = SPEC.scenes.length > 0;
+        if (built) {
+          updateAgentTodo(/Build the first complete video pass/i, 'completed', cur.step);
+          updateAgentTodo(/Verify all scenes and fix visual or code issues/i, 'in_progress', cur.step);
+        }
         cur.body.textContent = built
           ? 'Created ' + SPEC.scenes.length + ' scene' + (SPEC.scenes.length === 1 ? '' : 's') + ' · ' + DUR.toFixed(1) + 's.'
           : 'The model returned a spec, but the editor did not create any scenes. Check the replace_spec tool result.';
@@ -111,7 +200,8 @@ async function runAgent(userText) {
       }
     }
 
-    for (let step = buildHandledBeforeLoop ? 1 : 0; !buildFailedBeforeLoop && step < SAFE_CAP; step++) {
+    for (let step = buildHandledBeforeLoop ? 1 : 0; !buildFailedBeforeLoop && step < MAX_AGENT_STEPS; step++) {
+      stepsExecuted = step + 1;
       if (step) cur = beginStep(bubble);
       window.STEP_NOTE = '';
       $('stepInfo').textContent = 'step ' + (step + 1) + (tools ? '' : ' · tools off');
@@ -133,9 +223,27 @@ async function runAgent(userText) {
 
       if (acc.toolCalls && acc.toolCalls.length) {
         const sig = acc.toolCalls.map(tc => (tc.function && tc.function.name) + '(' + ((tc.function && tc.function.arguments) || '') + ')').join('|');
-        repeat = sig === lastSig ? repeat + 1 : 0;
-        lastSig = sig;
+        const sameSignatureCount = (signatureCounts.get(sig) || 0) + 1;
+        signatureCounts.set(sig, sameSignatureCount);
+        if (sameSignatureCount >= 4) {
+          loopGuardHit = true;
+          finalText = 'Stopped safely: the agent repeated the same tool-call sequence four times. The remaining tasks are still visible in Todo.';
+          cur.body.textContent = finalText;
+          break;
+        }
+        const callNames = acc.toolCalls.map(tc => tc.function && tc.function.name);
+        const lastVerifyIndex = callNames.lastIndexOf('verify_video');
+        const lastMutationIndex = Math.max(...callNames.map((name, index) =>
+          ['replace_spec', 'apply_ops', 'add_element', 'set_text', 'remove_element'].includes(name) ? index : -1));
         await execToolCalls(acc, cur, messages);
+        if (lastVerifyIndex > lastMutationIndex) {
+          const verifyResult = messages.slice(-callNames.length)[lastVerifyIndex];
+          hasVerified = verificationIssues(verifyResult && verifyResult.content).length === 0;
+        }
+        if (lastMutationIndex >= lastVerifyIndex && lastMutationIndex >= 0) hasVerified = false;
+        if (lastMutationIndex >= 0) updateAgentTodo(/Build the first complete video pass|Apply the requested video changes/i, 'completed', cur.step);
+        if (hasVerified) updateAgentTodo(/Verify all scenes and fix visual or code issues/i, 'completed', cur.step);
+        else if (lastVerifyIndex >= 0) updateAgentTodo(/Verify all scenes and fix visual or code issues/i, 'in_progress', cur.step);
         pruneTools(messages);
         built = SPEC.scenes.length > 0;
         if (lastPromptTokens > COMPACT_AT && messages.length > 10) {
@@ -143,10 +251,6 @@ async function runAgent(userText) {
           messages = await compactHistory(messages);
           lastPromptTokens = 0;
           addNote(cur.step, 'context compacted: ' + before + ' messages → ' + messages.length + ' (old tool results cleared, session summarised)');
-        }
-        if (repeat >= 3) {
-          cur.body.textContent = 'Stopped the loop: the model repeated the same call 4 times in a row.';
-          break;
         }
         continue;
       }
@@ -163,6 +267,7 @@ async function runAgent(userText) {
             contentCharacters: 0, toolCalls: 0
           });
         }
+        loopFinished = true;
         break;
       }
       const asJson = tryJson(finalText);
@@ -176,6 +281,7 @@ async function runAgent(userText) {
           } else {
             cur.body.textContent = 'The model returned JSON, but it is not a valid video spec. A spec must contain at least one scene with a duration and text/code elements.';
             finalText = cur.body.textContent;
+            loopFinished = true;
             break;
           }
         } else {
@@ -183,17 +289,38 @@ async function runAgent(userText) {
           finalText = asJson.say || '(updated the video)';
         }
         built = SPEC.scenes.length > 0;
-        break;
       }
 
+      if (taskRequiresAgentLoop && built && !hasVerified) {
+        const reportText = TOOL_IMPL.verify_video({});
+        showDirectToolResult(cur.step, 'verify_video', {}, reportText);
+        const issues = verificationIssues(reportText);
+        messages.push({ role: 'system', content: 'MANDATORY AUTOMATIC VERIFICATION REPORT:\n' + String(reportText).slice(0, 9000) + '\nFindings: ' + (issues.length ? issues.join(', ') : 'none') + '. Fix all findings before you finish.' });
+        if (issues.length) {
+          updateAgentTodo(/Verify all scenes and fix visual or code issues/i, 'in_progress', cur.step);
+          cur.body.textContent = 'Verification found issues (' + issues.join(', ') + '). Continuing to fix them.';
+          finalText = '';
+          continue;
+        }
+        hasVerified = true;
+        updateAgentTodo(/Verify all scenes and fix visual or code issues/i, 'completed', cur.step);
+        updateAgentTodo(/Review the finished result and report completion/i, 'completed', cur.step);
+        finalText = (finalText ? finalText + '\n\n' : '') + 'Automated verification passed: no code errors, blank frames, low-contrast text, off-frame elements or overlaps were reported.';
+      }
+
+      loopFinished = true;
       break;
     }
 
+    if (!loopFinished && !buildFailedBeforeLoop && (loopGuardHit || stepsExecuted >= MAX_AGENT_STEPS)) {
+      finalText = finalText || ('Stopped safely after ' + MAX_AGENT_STEPS + ' agent steps. The remaining tasks are still visible in Todo; no further model calls were sent.');
+      cur.body.textContent = finalText;
+    }
     const say = built
       ? (finalText || 'Built ' + SPEC.scenes.length + ' scene' + (SPEC.scenes.length === 1 ? '' : 's') + ' · ' + DUR.toFixed(1) + 's · ' + Math.round(DUR * 30) + ' frames.')
       : (finalText || '(no answer)');
     CHAT.push({ role: 'assistant', content: say });
-    agentStatus(built ? 'Video built.' : 'Done.');
+    agentStatus(loopGuardHit || (!loopFinished && stepsExecuted >= MAX_AGENT_STEPS) ? 'Stopped safely; review the remaining Todo items.' : (built ? 'Video built.' : 'Done.'));
   } catch (e) {
     if (e && (e.name === 'AbortError' || /aborted/i.test(e.message || ''))) {
       cur.body.textContent = 'Stopped. (nothing was sent back to the model)';
