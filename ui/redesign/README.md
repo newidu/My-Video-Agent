@@ -37,3 +37,16 @@ Remembered API keys are stored in browser `localStorage` on the current device a
 - Existing engine element IDs are preserved without duplicates.
 - The original 12 classic engine scripts remain in their existing order. The settings controller is loaded after them.
 - Keep the canvas, agent, editor, music, and skills behavior in their original engine files unless a separately tested engine change is necessary.
+
+
+## Lean editor layout
+
+The editor screen keeps only the controls needed during a normal edit:
+- project Open / Save
+- Undo / Redo, Preview / Play and Export
+- timeline scrubbing and return-to-start
+- source video attachment and the agent prompt
+- Cut / Erase and Poster actions
+- contextual Inspector sections for selection, scenes, elements and actual changes
+
+Static project placeholders, duplicate restart/preview headings, redundant navigation labels and empty Inspector sections are removed or hidden. Editor preferences (format, letter mode, music, fonts and export quality) remain in Settings rather than appearing a second time in the editor.
