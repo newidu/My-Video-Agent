@@ -40,10 +40,17 @@ for (const id of ['formatSel','btnLetter','btnMusicOn','btnFont','btnRestart']) 
 }
 if (html.includes('id="btnOpenSkills"') || html.includes('id="btnMusic"')) throw new Error('A Settings-only shortcut is still visible in the editor.');
 const settingsController = fs.readFileSync(path.join(root, 'ui', 'redesign', 'settings.js'),'utf8');
-if (!settingsController.includes('installToolCallRecovery') || !settingsController.includes("signal, 'required'")) throw new Error('Missing required-tool recovery for replace_spec.');
-if (!settingsController.includes('__LAST_TOOL_CALL_DIAGNOSTIC')) throw new Error('Missing actionable tool-call failure diagnostics.');
+const modelStream = fs.readFileSync(path.join(root, 'src', 'agent', 'model-streaming-context.js'),'utf8');
 const agentLoop = fs.readFileSync(path.join(root, 'src', 'agent', 'loop.js'),'utf8');
-if (!agentLoop.includes('if (!built) break;')) throw new Error('Agent must stop cleanly after an unrecovered build tool call.');
+const agentTools = fs.readFileSync(path.join(root, 'src', 'agent', 'tools.js'),'utf8');
+const agentSession = fs.readFileSync(path.join(root, 'src', 'agent', 'session-and-skills.js'),'utf8');
+if (!modelStream.includes('async function buildVideoWithRecovery') || !modelStream.includes("choice: 'required'")) throw new Error('Video build recovery must live in the model transport and request required tool calls.');
+if (settingsController.includes('installToolCallRecovery')) throw new Error('Model recovery must not be owned by the Settings UI.');
+if (!modelStream.includes('responseFormat: { type: \'json_object\' }') || !modelStream.includes('validBuildSpec')) throw new Error('JSON-output fallback and video spec validation are missing.');
+if (!agentLoop.includes('buildVideoWithRecovery(messages, tools')) throw new Error('The agent loop does not call the first-class video build recovery.');
+if (!agentLoop.includes("newVideoBuild ? 'off'")) throw new Error('New video builds must start with thinking disabled.');
+if (!agentTools.includes('maximum 40 scenes per build') || !agentTools.includes('minItems: 1')) throw new Error('replace_spec payload validation/schema is incomplete.');
+if (!agentSession.includes('NEW VIDEO FIRST') || agentSession.includes('1. PLAN FIRST.')) throw new Error('System prompt still contains conflicting first-action instructions.');
 
 if (html.includes('project-tile') || html.includes('Untitled project')) throw new Error('Static project placeholder remains in the editor sidebar.');
 if (html.includes('class="preview-toolbar"')) throw new Error('Redundant preview heading remains above the canvas.');
@@ -64,18 +71,25 @@ for (const marker of ['function sendPrompt()', 'function syncSpec()', 'window.SK
  if (!source.includes(marker)) throw new Error('Original source validation failed; missing ' + marker);
 }
 const sections = [
- [334,521,'src/canvas/primitives.js'], [522,970,'src/canvas/scene-engine.js'],
- [971,1966,'src/editor/interaction.js'], [1967,2018,'src/features/fonts.js'],
- [2019,2527,'src/features/audio-music.js'], [2528,2920,'src/editor/history-and-audit.js'],
- [2921,3368,'src/agent/session-and-skills.js'], [3369,3951,'src/agent/tools.js'],
- [3952,4189,'src/agent/model-streaming-context.js'], [4190,4374,'src/agent/loop.js'],
- [4375,4526,'src/agent/spec-bridge-and-boot.js']
+ ['/* ============================================================\\n   CANVAS PRIMITIVES','/* ---------------- edit model ---------------- */','src/canvas/primitives.js'],
+ ['/* ---------------- edit model ---------------- */','/* ============================================================\\n   Editor UI — select / drag / edit / delete / export','src/canvas/scene-engine.js'],
+ ['/* ============================================================\\n   Editor UI — select / drag / edit / delete / export','/* ============================================================\\n   FONT TOOL','src/editor/interaction.js'],
+ ['/* ============================================================\\n   FONT TOOL','/* ============================================================\\n   MUSIC & BEAT','src/features/fonts.js'],
+ ['/* ============================================================\\n   MUSIC & BEAT','/* ============================================================\\n   TOOLBOX','src/features/audio-music.js'],
+ ['/* ============================================================\\n   TOOLBOX','/* ============================================================\\n   DEEPSEEK AGENT','src/editor/history-and-audit.js'],
+ ['/* ============================================================\\n   DEEPSEEK AGENT','/* ---------- tools ---------- */','src/agent/session-and-skills.js'],
+ ['/* ---------- tools ---------- */','/* ---------- streaming model call ---------- */','src/agent/tools.js'],
+ ['/* ---------- streaming model call ---------- */','/* ---------- the agent loop ---------- */','src/agent/model-streaming-context.js'],
+ ['/* ---------- the agent loop ---------- */','/* ---------- applying the answer ---------- */','src/agent/loop.js'],
+ ['/* ---------- applying the answer ---------- */','</script>','src/agent/spec-bridge-and-boot.js']
 ];
-const sourceLines = source.split(/\r?\n/);
-for (const [start,end,file] of sections) {
- const actual = fs.readFileSync(path.join(root,file),'utf8').split(/\r?\n/).slice(1).join('\n');
- const expected = sourceLines.slice(start-1,end).join('\n') + '\n';
- if (actual !== expected) throw new Error('Extracted code differs from original source in ' + file);
+for (const [startMarker,endMarker,file] of sections) {
+ const start = source.indexOf(startMarker);
+ const end = source.indexOf(endMarker, start + startMarker.length);
+ if (start < 0 || end < 0 || end <= start) throw new Error('Could not resolve source section markers for ' + file);
+ const expected = source.slice(start, end);
+ const actual = fs.readFileSync(path.join(root,file),'utf8').split(/\\r?\\n/).slice(1).join('\\n');
+ if (actual !== expected) throw new Error('Extracted code differs from original source section in ' + file + '. Keep original/source.html and the modular file synchronized.');
 }
 const skillStart = source.indexOf('window.SKILL_FILES = ') + 'window.SKILL_FILES = '.length;
 const skillEnd = source.indexOf(';\nwindow.SKILL_ORDER = ', skillStart);
