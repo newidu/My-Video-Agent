@@ -76,14 +76,9 @@
           <div class="settings-page-heading"><h1>General</h1></div>
           <section class="settings-card">
             <div class="settings-card-heading"><div><span class="settings-kicker">STARTUP</span><h3>Startup experience</h3></div></div>
-            <div class="setting-row"><div><label for="settingStartupView">Open app to</label><p>Choose which workspace is shown when the app starts.</p></div><select id="settingStartupView"><option value="editor">Video editor</option><option value="settings">Settings</option></select></div>
+            <div class="setting-row"><div><label for="settingStartupView">Open app to</label></div><select id="settingStartupView"><option value="editor">Video editor</option><option value="settings">Settings</option></select></div>
           </section>
-          <section class="settings-card">
-            <div class="settings-card-heading"><div><span class="settings-kicker">WORKSPACE</span><h3>Project defaults</h3></div></div>
-            <div class="setting-row"><div><label>Default video format</label><p>Choose your preferred aspect ratio in Video editor settings.</p></div><button class="settings-secondary-button" data-open-settings="editor">Configure editor</button></div>
-            <div class="setting-row"><div><label>Provider and model</label><p>Connect a model provider and manage saved model profiles.</p></div><button class="settings-secondary-button" data-open-settings="providers">Manage providers</button></div>
-            <div class="setting-row"><div><label>Skills and agent tools</label><p>Control which capabilities and workflow instructions are available to the agent.</p></div><button class="settings-secondary-button" data-open-settings="skills">Manage skills</button></div>
-          </section>
+
         </section>
         <section class="settings-panel" data-settings-panel="appearance"><div class="settings-page-heading"><h1>Appearance</h1></div>
         <section class="settings-card">
@@ -105,7 +100,7 @@
                 <option value="16:9">16:9 · Landscape / YouTube</option>
                 <option value="1:1">1:1 · Square</option>
               </select>
-              <small class="settings-help">Used as your preferred starting format. Apply it to the open project with the button below.</small>
+              <small class="settings-help">Choose the format used when a new project opens.</small>
             </div>
             <div class="settings-button-row"><button id="btnApplyDefaultFormat" class="settings-secondary-button">Apply to current project</button></div>
             <div class="setting-row">
@@ -113,11 +108,11 @@
               <input type="checkbox" id="settingLetterMode">
             </div>
             <div class="setting-row">
-              <div><label for="settingShowBeatGrid">Show beat grid when music is active</label><p>Display the music beat markers on the timeline.</p></div>
+              <div><label for="settingShowBeatGrid">Show beat grid when music is active</label></div>
               <input type="checkbox" id="settingShowBeatGrid">
             </div>
             <div class="setting-row">
-              <div><label for="settingExportBitrate">Video export quality</label><p>Controls the encoded video bitrate. Higher bitrates create larger files.</p></div>
+              <div><label for="settingExportBitrate">Video export quality</label></div>
               <select id="settingExportBitrate"><option value="4000000">Standard · 4 Mbps</option><option value="9000000">High · 9 Mbps</option><option value="16000000">Ultra · 16 Mbps</option></select>
             </div>
           </div>
@@ -129,20 +124,11 @@
             <button id="btnFontSettings" class="settings-secondary-button" type="button">Add font</button>
           </div>
         </section>
-        <section class="settings-card">
-          <div class="settings-card-heading"><div><span class="settings-kicker">EDITING WORKFLOW</span><h3>Available editor tools</h3></div></div>
-          <div class="settings-feature-list">
-            <div><b>Canvas editing</b><span>Select, drag, edit and remove text, shapes and drawn elements.</span></div>
-            <div><b>Scenes and timeline</b><span>Scene selection, playback, scrubbing, undo/redo and project save/load.</span></div>
-            <div><b>Cut and erase</b><span>Area selection, crop, cut-out and destructive erase operations.</span></div>
-            <div><b>Typography</b><span>Upload custom TTF/OTF/WOFF fonts and edit text styles.</span></div>
-            <div><b>Export</b><span>Render the current composition to a video file or export a poster image.</span></div>
-          </div>
-        </section></section>
+</section>
         <section class="settings-panel" data-settings-panel="providers"><div class="settings-page-heading"><h1>Providers &amp; models</h1></div>
         <div class="settings-callout">
           <span class="callout-icon">⌘</span>
-          <div><strong>One agent · multiple model providers</strong><p>Connect an OpenAI-compatible API, choose a model, and switch profiles without replacing your video editor. Each provider keeps its own endpoint, model and saved key.</p></div>
+          <div><strong>One agent · multiple model providers</strong><p>Each provider has its own API key, endpoint and model profile.</p></div>
         </div>
         <section class="settings-card">
           <div class="settings-card-heading">
@@ -257,17 +243,17 @@
           </div>
           <div class="settings-fields">
             <div class="setting-row setting-row-stacked">
-              <div><label for="thinking">Thinking mode</label><p>DeepSeek extended thinking. Other compatible providers use their standard request format.</p></div>
+              <div><label for="thinking">Thinking mode</label></div>
               <select id="thinking" title="Thinking mode">
                 <option value="auto">Auto</option><option value="on">On</option><option value="off">Off</option>
               </select>
             </div>
             <div class="setting-row">
-              <div><label for="modelRoute">Route routine steps to DeepSeek Flash</label><p>Use Flash for mechanical tool steps when DeepSeek is the active provider.</p></div>
+              <div><label for="modelRoute">Route routine steps to DeepSeek Flash</label></div>
               <input type="checkbox" id="modelRoute" checked>
             </div>
             <div class="setting-row">
-              <div><label for="useTools">Agent tools and action loop</label><p>Allow the agent to edit scenes, manipulate elements, inspect frames and export video.</p></div>
+              <div><label for="useTools">Agent tools and action loop</label></div>
               <input type="checkbox" id="useTools" checked>
             </div>
             <p class="settings-inline-status" id="stepInfo"></p>
@@ -277,7 +263,7 @@
         <section class="settings-panel" data-settings-panel="tools"><div class="settings-page-heading"><h1>Tools</h1></div>
         <section class="settings-card">
           <div class="settings-card-heading"><div><span class="settings-kicker">TOOL ACCESS</span><h3>Agent tool library</h3></div></div>
-          <p class="settings-copy">Core safety, project-editing and recovery tools remain enabled. Optional tools can be activated here; the agent discovers enabled tools when needed.</p>
+          <p class="settings-copy">Optional tools can be enabled below. Core editing and recovery tools stay on.</p>
           <div id="toolSettingsList" class="tool-settings-list"><div class="settings-loading">Loading available tools…</div></div>
           <div class="settings-button-row"><button id="btnResetTools" class="settings-secondary-button">Reset optional tools</button></div>
         </section></section>
@@ -391,8 +377,7 @@
     <aside id="agentPane">
       <div class="paneHead agent-pane-head">
         <div class="agent-heading">
-          <span class="agent-eyebrow">AI ASSISTANT</span>
-          <strong>Video agent</strong>
+                    <strong>Video agent</strong>
         </div>
         <div class="agent-head-actions">
           <span id="usage" class="usage" title="Tokens used this session">— tok</span>
