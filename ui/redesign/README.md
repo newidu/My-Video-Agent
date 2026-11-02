@@ -1,10 +1,18 @@
-# UI/UX redesign area
+# UI/UX redesign
 
-The current functional UI lives in `../index.html` and `../styles/base.css`.
-Create the future redesigned UI in this folder without moving or rewriting the engine modules.
+The active UI uses a Claude Code-inspired desktop workspace layout:
+- left workspace navigation with project file actions and quick tools
+- dedicated AI conversation pane with collapsible model/connection and skill settings
+- live video canvas with a separate inspector panel
+- warm charcoal surfaces, restrained terracotta accents, compact typography, keyboard-oriented controls
 
-Integration contract:
-- Preserve the element IDs used by the engine, or provide a compatibility layer.
-- Load the engine script files in the same order shown in `../index.html`.
-- Keep the agent, canvas, media, skills, playback, editor and tools logic in `src/`; do not duplicate it in UI code.
-- Keep desktop-only APIs behind the Electron preload bridge when that wrapper is reintroduced.
+The design is an original implementation inspired by the interaction patterns and visual language of modern coding-agent workspaces. It does not copy Claude Code branding or assets.
+
+## Integration contract
+
+- The functional UI entry point remains `ui/index.html`.
+- The redesign stylesheet is `ui/redesign/claude.css`; the original `ui/styles/base.css` is retained as the engine's compatibility baseline.
+- All existing engine element IDs are preserved.
+- The original classic engine scripts load in the same order. Do not convert them to ES modules without a separate migration.
+- Keep editing, agent, canvas, audio, skills, and persistence logic in `src/` and `skills/`; this layer is presentation only.
+- Model settings and skill pack remain available from the left navigation.
