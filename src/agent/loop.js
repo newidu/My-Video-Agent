@@ -150,7 +150,6 @@ async function runAgent(userText) {
 
   let cur = beginStep(bubble);
   const taskRequiresAgentLoop = !!(tools && wantsVideo(userText));
-  if (taskRequiresAgentLoop) runAgentPreflight(userText, cur.step, messages, newVideoBuild);
   const render = acc => {
     if (acc.reasoning) {
       cur.think.style.display = '';
@@ -166,6 +165,7 @@ async function runAgent(userText) {
   let built = SPEC.scenes.length > 0;
   let lastPromptTokens = 0;
   try {
+    if (taskRequiresAgentLoop) runAgentPreflight(userText, cur.step, messages, newVideoBuild);
     const signatureCounts = new Map();
     let loopGuardHit = false;
     let loopFinished = false;
@@ -236,7 +236,10 @@ async function runAgent(userText) {
         const lastMutationIndex = Math.max(...callNames.map((name, index) =>
           ['replace_spec', 'apply_ops', 'add_element', 'set_text', 'remove_element'].includes(name) ? index : -1));
         await execToolCalls(acc, cur, messages);
-        if (lastVerifyIndex > lastMutationIndex) hasVerified = true;
+        if (lastVerifyIndex > lastMutationIndex) {
+          const verifyResult = messages.slice(-callNames.length)[lastVerifyIndex];
+          hasVerified = verificationIssues(verifyResult && verifyResult.content).length === 0;
+        }
         if (lastMutationIndex >= lastVerifyIndex && lastMutationIndex >= 0) hasVerified = false;
         if (lastMutationIndex >= 0) updateAgentTodo(/Build the first complete video pass|Apply the requested video changes/i, 'completed', cur.step);
         if (hasVerified) updateAgentTodo(/Verify all scenes and fix visual or code issues/i, 'completed', cur.step);
@@ -248,10 +251,6 @@ async function runAgent(userText) {
           messages = await compactHistory(messages);
           lastPromptTokens = 0;
           addNote(cur.step, 'context compacted: ' + before + ' messages → ' + messages.length + ' (old tool results cleared, session summarised)');
-        }
-        if (repeat >= 3) {
-          cur.body.textContent = 'Stopped the loop: the model repeated the same call 4 times in a row.';
-          break;
         }
         continue;
       }
@@ -282,6 +281,7 @@ async function runAgent(userText) {
           } else {
             cur.body.textContent = 'The model returned JSON, but it is not a valid video spec. A spec must contain at least one scene with a duration and text/code elements.';
             finalText = cur.body.textContent;
+            loopFinished = true;
             break;
           }
         } else {
