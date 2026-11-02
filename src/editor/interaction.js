@@ -890,15 +890,23 @@ function loadProject(file) {
   fr.onload = () => {
     try {
       const d = JSON.parse(fr.result);
-      if (d.spec) {
-        SPEC = d.spec; buildScenes(); syncSpec();
-        if (SPEC.sfx) { SFX.length = 0; SPEC.sfx.forEach(s => SFX.push(Object.assign({}, s))); renderSfxList(); }
-        if (SPEC.music) {
+      if (d.spec && typeof d.spec === 'object') {
+        /* Normalize imported JSON just like agent output. This prevents a corrupt
+           or hand-edited project from poisoning the scene timeline/render loop,
+           while retaining optional audio/font metadata for the restore steps below. */
+        const rawSpec = d.spec;
+        SPEC = normalizeSpec(rawSpec);
+        if (rawSpec.sfx) SPEC.sfx = rawSpec.sfx;
+        if (rawSpec.music) SPEC.music = rawSpec.music;
+        if (rawSpec.fonts) SPEC.fonts = rawSpec.fonts;
+        buildScenes(); syncSpec();
+        if (Array.isArray(SPEC.sfx)) { SFX.length = 0; SPEC.sfx.forEach(s => SFX.push(Object.assign({}, s))); renderSfxList(); }
+        if (SPEC.music && typeof SPEC.music === 'object') {
           Object.assign(MUSIC, SPEC.music);
           if (MUSIC.dataUrl) { audioEl.src = MUSIC.dataUrl; hookMusicAudio(); }
           applyMusic(true);
         }
-        if (SPEC.fonts) Object.keys(SPEC.fonts).forEach(n => registerFont(n, SPEC.fonts[n]));
+        if (SPEC.fonts && typeof SPEC.fonts === 'object') Object.keys(SPEC.fonts).forEach(n => registerFont(n, SPEC.fonts[n]));
       }
       EDIT.items = d.items || {};
       EDIT.scenes = d.scenes || {};

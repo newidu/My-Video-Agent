@@ -55,28 +55,52 @@ function fileSizeLabel(bytes) { return (bytes / 1048576).toFixed(2) + ' MB'; }
 async function countVideoFrames() {
   const v = MEDIA.video;
   if (!v) return null;
-  // decode the clip at high speed and count real frames
+  // Decode the clip before reading duration. A fixed delay here used to resolve
+  // before slow files were ready and report a zero-duration/zero-frame clip.
   const clone = document.createElement('video');
   clone.src = v.src; clone.muted = true; clone.playsInline = true; clone.preload = 'auto';
-  await new Promise((res, rej) => {
-    clone.onloadeddata = res;
-    clone.onerror = () => rej(new Error('could not decode'));
-    setTimeout(res, 4000);
+  await new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      clone.onloadeddata = null;
+      clone.onerror = null;
+      fn(value);
+    };
+    const timeout = setTimeout(() => finish(reject, new Error('could not decode video before the 10 second timeout')), 10000);
+    clone.onloadeddata = () => finish(resolve);
+    clone.onerror = () => finish(reject, new Error('could not decode'));
+    clone.load();
   });
   let frames = 0;
-  const d = clone.duration || 0;
+  const d = Number.isFinite(clone.duration) ? clone.duration : 0;
+  // Safari and older embedded browsers do not expose requestVideoFrameCallback.
+  // Return a clearly marked estimate instead of throwing and failing the tool.
+  if (typeof clone.requestVideoFrameCallback !== 'function') {
+    try { clone.pause(); } catch (e) {}
+    return { frames: Math.round(d * 30), duration: +d.toFixed(3), fps: 30,
+             estimated: true, width: clone.videoWidth, height: clone.videoHeight };
+  }
   await new Promise(resolve => {
     let live = true;
-    const tick = (now, meta) => {
-      frames++;
+    let timer;
+    const finish = () => {
       if (!live) return;
-      if (clone.ended || clone.currentTime >= d - 0.02 || frames > 20000) { live = false; return resolve(); }
+      live = false;
+      clearTimeout(timer);
+      resolve();
+    };
+    const tick = () => {
+      frames++;
+      if (clone.ended || clone.currentTime >= d - 0.02 || frames > 20000) return finish();
       clone.requestVideoFrameCallback(tick);
     };
+    timer = setTimeout(finish, Math.min(15000, Math.max(2000, d * 1000 + 2000)));
     clone.requestVideoFrameCallback(tick);
     const play = clone.play();
-    if (play && play.catch) play.catch(() => { live = false; resolve(); });
-    setTimeout(() => { if (live) { live = false; resolve(); } }, Math.min(15000, d * 1000 + 2000));
+    if (play && play.catch) play.catch(finish);
   });
   try { clone.pause(); } catch (e) {}
   return { frames, duration: +d.toFixed(3), fps: d ? +(frames / d).toFixed(2) : 0,
