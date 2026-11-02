@@ -334,12 +334,29 @@ const TOOL_IMPL = {
     return txt.length > 12000 ? txt.slice(0, 12000) + '\n…(truncated at 12k chars — cite what you need)' : txt;
   },
   replace_spec(args) {
-    if (!args || !args.spec) return 'missing spec';
-    applyAgentResult({ action: 'replace', spec: args.spec, say: '' });
-    noteWrite();
-    renderFrame(time);
-    return 'built ' + SCENES.length + ' scenes, ' + DUR.toFixed(2) + 's, ' + Math.round(DUR * 30) + ' frames at 30fps.'
-      + codeErrNote();
+    if (!args || !args.spec || !Array.isArray(args.spec.scenes)) return 'invalid spec: expected {spec:{format,scenes:[...]}}';
+    if (!args.spec.scenes.length) return 'invalid spec: scenes must contain at least one scene';
+    if (args.spec.scenes.length > 40) return 'invalid spec: maximum 40 scenes per build';
+    for (let i = 0; i < args.spec.scenes.length; i++) {
+      const scene = args.spec.scenes[i];
+      if (!scene || typeof scene !== 'object') return 'invalid spec: scene ' + (i + 1) + ' is not an object';
+      if (!Number.isFinite(Number(scene.dur)) || Number(scene.dur) <= 0) return 'invalid spec: scene ' + (i + 1) + ' needs a positive numeric dur';
+      if (scene.elements !== undefined && !Array.isArray(scene.elements)) return 'invalid spec: scene ' + (i + 1) + ' elements must be an array';
+      if (Array.isArray(scene.elements) && scene.elements.length > 40) return 'invalid spec: maximum 40 elements per scene';
+      if (Array.isArray(scene.elements) && scene.elements.some(el => !el || !['text', 'code'].includes(el.type))) {
+        return 'invalid spec: scene ' + (i + 1) + ' contains an unsupported element type; use text or code';
+      }
+    }
+    try {
+      applyAgentResult({ action: 'replace', spec: args.spec, say: '' });
+      if (!SPEC.scenes.length || !SCENES.length || !(DUR > 0)) return 'build failed: the spec created no valid scenes';
+      noteWrite();
+      renderFrame(time);
+      return 'built ' + SCENES.length + ' scenes, ' + DUR.toFixed(2) + 's, ' + Math.round(DUR * 30) + ' frames at 30fps.'
+        + codeErrNote();
+    } catch (error) {
+      return 'build failed while applying the spec: ' + String(error && error.message || error).slice(0, 300);
+    }
   },
   apply_ops(args) {
     const blocked = needRead('apply_ops');
@@ -545,7 +562,74 @@ function toolSchema() {
       parameters: name === 'grab_frame' ? { type: 'object', properties: { time: { type: 'number', description: 'seconds' } }, required: ['time'] }
         : name === 'read_skill' ? { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] }
         : name === 'set_playhead' ? { type: 'object', properties: { time: { type: 'number' } }, required: ['time'] }
-        : name === 'replace_spec' ? { type: 'object', properties: { spec: { type: 'object' } }, required: ['spec'] }
+        : name === 'replace_spec' ? {
+            type: 'object',
+            properties: {
+              spec: {
+                type: 'object',
+                description: 'Complete video project specification. Include format and a non-empty scenes array. Each scene requires id, dur and elements.',
+                properties: {
+                  title: { type: 'string' },
+                  format: { type: 'string', enum: ['9:16', '16:9', '1:1'] },
+                  fps: { type: 'integer', enum: [30] },
+                  style: {
+                    type: 'object',
+                    properties: {
+                      palette: { type: 'array', items: { type: 'string' } },
+                      fonts: { type: 'array', items: { type: 'string' } },
+                      rules: { type: 'string' }
+                    }
+                  },
+                  scenes: {
+                    type: 'array',
+                    minItems: 1,
+                    maxItems: 40,
+                    items: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string' },
+                        name: { type: 'string' },
+                        dur: { type: 'number', minimum: 0.6, maximum: 30 },
+                        bg: { type: 'string' },
+                        js: { type: 'string', description: 'Optional deterministic scene background drawing code.' },
+                        elements: {
+                          type: 'array',
+                          maxItems: 40,
+                          items: {
+                            type: 'object',
+                            properties: {
+                              id: { type: 'string' },
+                              type: { type: 'string', enum: ['text', 'code'] },
+                              text: { type: 'string' },
+                              label: { type: 'string' },
+                              x: { type: 'number' },
+                              y: { type: 'number' },
+                              w: { type: 'number' },
+                              h: { type: 'number' },
+                              size: { type: 'number' },
+                              color: { type: 'string' },
+                              align: { type: 'string', enum: ['left', 'center', 'right'] },
+                              family: { type: 'string' },
+                              weight: { type: 'number' },
+                              ls: { type: 'number' },
+                              outline: { type: 'number' },
+                              anim: { type: 'string', enum: ['pop', 'rise', 'slideL', 'slideR', 'fade', 'none'] },
+                              delay: { type: 'number' },
+                              js: { type: 'string' }
+                            },
+                            required: ['type']
+                          }
+                        }
+                      },
+                      required: ['id', 'dur', 'elements']
+                    }
+                  }
+                },
+                required: ['scenes']
+              }
+            },
+            required: ['spec']
+          }
         : name === 'apply_ops' ? { type: 'object', properties: { ops: { type: 'array', items: { type: 'object' } } }, required: ['ops'] }
         : name === 'check_code' ? { type: 'object', properties: { js: { type: 'string' }, t: { type: 'number' } }, required: ['js'] }
         : name === 'add_element' ? { type: 'object', properties: { sceneId: { type: 'string' }, element: { type: 'object' } }, required: ['sceneId', 'element'] }
