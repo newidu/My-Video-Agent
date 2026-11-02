@@ -22,7 +22,7 @@ DeepSeek-specific thinking and Flash routing are only sent when DeepSeek is sele
 
 Anthropic's native Messages API, AWS Bedrock, Google Vertex AI and Azure-specific authentication are shown as planned integrations, not as supported drop-in providers. They require separate native protocol or authentication adapters. Custom OpenAI-compatible gateways can be used where configured.
 
-This project currently connects text/agent model providers. It does not yet expose native API credentials or integrations for third-party video generation, image generation, transcription or TTS services. The current video composition is rendered through the app's canvas editor; music and beat synthesis use the existing local audio engine.
+This project currently connects text/agent model providers. It does not yet expose native API credentials or integrations for third-party video generation, image generation, transcription or TTS services. The current video composition is rendered through the app's canvas editor; music and beat synthesis use the existing local audio engine. Export quality is adjustable through the browser's MediaRecorder bitrate option; frame capture currently runs at the editor's fixed 30 fps.
 
 ## Security
 
