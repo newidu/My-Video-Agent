@@ -1,4 +1,4 @@
-/* Agent execution loop and multi-step tool orchestration. Extracted from original/source.html lines 4190-4373. */
+/* Video agent execution loop and first-build orchestration. Section boundaries are validated against original/source.html by scripts/check.js. */
 /* ---------- the agent loop ---------- */
 /* no step limit: the loop runs until the model stops calling tools (Stop button always works).
    SAFE_CAP only exists so a broken stream can never spin forever — it is far above any real run. */
