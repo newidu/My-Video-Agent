@@ -3266,7 +3266,7 @@ function systemPrompt() {
     '',
     ...(SKILL_INDEX_ONLY && !SKILL_ALL
       ? ['The SKILL PACK is indexed below (file, one-line summary, size) — it is the human\'s own playbook, kept verbatim. Open the two or three files that match this brief with read_skill({path}) BEFORE you design; the index is a menu, not the manual. Follow its workflow, story rules, motion-graphics guidance and verification habits. Your only departure is that you cannot call FFmpeg or image/video models here — you drive the deterministic canvas engine described next, and you have the tools listed after it.']
-      : ['Below is the SKILL PACK in full, verbatim, exactly as the human wrote it. Follow its workflow, story rules, motion-graphics guidance and verification habits. Your only departure is that you cannot call FFmpeg or image/video models here — you drive the deterministic canvas engine described second, and you have the tools listed third.']),
+      : ['Below is the SKILL PACK in full, verbatim, exactly as the human wrote it. For a new empty project, create the first complete video with replace_spec immediately, then follow relevant skill workflows to refine and verify it. For edits to an existing project, follow relevant skills before changing it. Your only departure is that you cannot call FFmpeg or image/video models here — you drive the deterministic canvas engine described second.']),
     '',
     SKILL_INDEX_ONLY && !SKILL_ALL ? '===================== SKILL PACK INDEX =====================' : '===================== SKILL PACK (verbatim) =====================',
     skillText(),
@@ -3309,7 +3309,7 @@ function systemPrompt() {
     '',
     '===================== HOW YOU WORK =====================',
     'You are not a chatbot that describes videos; you are an agent that builds them. Keep going until the job is done — never stop after a plan, never ask permission to do the obvious next step.',
-    '1. PLAN FIRST. The moment a request needs more than one step, call todo_write with 3-6 concrete tasks (one in_progress, the rest pending). Keep exactly one in_progress. Mark a task completed the instant it is finished, not in a batch at the end. Rewrite the list when the work changes.',
+    '1. NEW VIDEO FIRST. When the project is empty and the human asks for a video, the first tool call MUST be replace_spec with the complete first-pass video. Do not call todo_write or read_skill before this first build. After the first pass, verify it, read relevant skills and refine; use todo_write for the remaining multi-step work.',
     '2. READ BEFORE YOU REWRITE. Before you modify an existing element (set_text, apply_ops, remove_element) call get_project() first; the tools refuse edits made on a stale picture. New work (replace_spec, add_element) needs no read.',
     '3. BATCH. Independent tool calls go in the SAME turn (e.g. three add_element calls, or get_project + verify_video). Do not spend a turn per call.',
     '4. VERIFY AFTER EVERY CHANGE. verify_video() for structure and blank frames, grab_frame({time}) when you need the real pixel statistics, and the tool result already reports code errors for the frame. Fix what the report says before moving on.',
@@ -3347,7 +3347,7 @@ function systemPrompt() {
     'set_playhead({time})              move the playhead so the human sees that frame',
     'export_video() / export_poster()  download the finished video / a poster PNG',
     '',
-    'RULES: when the human asks for a video, your FIRST action is replace_spec with a complete spec — never reply with only a plan or a question, build it and then refine it in the loop.',
+    'RULES: when the project is empty and the human asks for a video, the FIRST tool call is replace_spec with a complete spec. Do not send only a plan, question, todo_write or skill read before the first build. After the first build, verify it, read matching skills, refine it in the loop and then answer.',
     'After you build, call verify_video() and fix whatever it reports (code errors, blank frames) before you answer.',
     'Never invent a template — the stage is empty and everything on it must come from you; think in the loop, call tools before guessing, keep answers short and concrete, and put the user-facing summary in plain text (no JSON needed when you use tools). If the human edits by hand afterwards, read get_project() again before your next change.'
   ].filter(line => {
@@ -3701,12 +3701,29 @@ const TOOL_IMPL = {
     return txt.length > 12000 ? txt.slice(0, 12000) + '\n…(truncated at 12k chars — cite what you need)' : txt;
   },
   replace_spec(args) {
-    if (!args || !args.spec) return 'missing spec';
-    applyAgentResult({ action: 'replace', spec: args.spec, say: '' });
-    noteWrite();
-    renderFrame(time);
-    return 'built ' + SCENES.length + ' scenes, ' + DUR.toFixed(2) + 's, ' + Math.round(DUR * 30) + ' frames at 30fps.'
-      + codeErrNote();
+    if (!args || !args.spec || !Array.isArray(args.spec.scenes)) return 'invalid spec: expected {spec:{format,scenes:[...]}}';
+    if (!args.spec.scenes.length) return 'invalid spec: scenes must contain at least one scene';
+    if (args.spec.scenes.length > 40) return 'invalid spec: maximum 40 scenes per build';
+    for (let i = 0; i < args.spec.scenes.length; i++) {
+      const scene = args.spec.scenes[i];
+      if (!scene || typeof scene !== 'object') return 'invalid spec: scene ' + (i + 1) + ' is not an object';
+      if (!Number.isFinite(Number(scene.dur)) || Number(scene.dur) <= 0) return 'invalid spec: scene ' + (i + 1) + ' needs a positive numeric dur';
+      if (!Array.isArray(scene.elements) || !scene.elements.length) return 'invalid spec: scene ' + (i + 1) + ' needs at least one text or code element';
+      if (scene.elements.length > 40) return 'invalid spec: maximum 40 elements per scene';
+      if (Array.isArray(scene.elements) && scene.elements.some(el => !el || !['text', 'code'].includes(el.type))) {
+        return 'invalid spec: scene ' + (i + 1) + ' contains an unsupported element type; use text or code';
+      }
+    }
+    try {
+      applyAgentResult({ action: 'replace', spec: args.spec, say: '' });
+      if (!SPEC.scenes.length || !SCENES.length || !(DUR > 0)) return 'build failed: the spec created no valid scenes';
+      noteWrite();
+      renderFrame(time);
+      return 'built ' + SCENES.length + ' scenes, ' + DUR.toFixed(2) + 's, ' + Math.round(DUR * 30) + ' frames at 30fps.'
+        + codeErrNote();
+    } catch (error) {
+      return 'build failed while applying the spec: ' + String(error && error.message || error).slice(0, 300);
+    }
   },
   apply_ops(args) {
     const blocked = needRead('apply_ops');
@@ -3912,7 +3929,75 @@ function toolSchema() {
       parameters: name === 'grab_frame' ? { type: 'object', properties: { time: { type: 'number', description: 'seconds' } }, required: ['time'] }
         : name === 'read_skill' ? { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] }
         : name === 'set_playhead' ? { type: 'object', properties: { time: { type: 'number' } }, required: ['time'] }
-        : name === 'replace_spec' ? { type: 'object', properties: { spec: { type: 'object' } }, required: ['spec'] }
+        : name === 'replace_spec' ? {
+            type: 'object',
+            properties: {
+              spec: {
+                type: 'object',
+                description: 'Complete video project specification. Include format and a non-empty scenes array. Each scene requires id, dur and elements.',
+                properties: {
+                  title: { type: 'string' },
+                  format: { type: 'string', enum: ['9:16', '16:9', '1:1'] },
+                  fps: { type: 'integer', enum: [30] },
+                  style: {
+                    type: 'object',
+                    properties: {
+                      palette: { type: 'array', items: { type: 'string' } },
+                      fonts: { type: 'array', items: { type: 'string' } },
+                      rules: { type: 'string' }
+                    }
+                  },
+                  scenes: {
+                    type: 'array',
+                    minItems: 1,
+                    maxItems: 40,
+                    items: {
+                      type: 'object',
+                      properties: {
+                        id: { type: 'string' },
+                        name: { type: 'string' },
+                        dur: { type: 'number', minimum: 0.6, maximum: 30 },
+                        bg: { type: 'string' },
+                        js: { type: 'string', description: 'Optional deterministic scene background drawing code.' },
+                        elements: {
+                          type: 'array',
+                          minItems: 1,
+                          maxItems: 40,
+                          items: {
+                            type: 'object',
+                            properties: {
+                              id: { type: 'string' },
+                              type: { type: 'string', enum: ['text', 'code'] },
+                              text: { type: 'string' },
+                              label: { type: 'string' },
+                              x: { type: 'number' },
+                              y: { type: 'number' },
+                              w: { type: 'number' },
+                              h: { type: 'number' },
+                              size: { type: 'number' },
+                              color: { type: 'string' },
+                              align: { type: 'string', enum: ['left', 'center', 'right'] },
+                              family: { type: 'string' },
+                              weight: { type: 'number' },
+                              ls: { type: 'number' },
+                              outline: { type: 'number' },
+                              anim: { type: 'string', enum: ['pop', 'rise', 'slideL', 'slideR', 'fade', 'none'] },
+                              delay: { type: 'number' },
+                              js: { type: 'string' }
+                            },
+                            required: ['type']
+                          }
+                        }
+                      },
+                      required: ['id', 'dur', 'elements']
+                    }
+                  }
+                },
+                required: ['scenes']
+              }
+            },
+            required: ['spec']
+          }
         : name === 'apply_ops' ? { type: 'object', properties: { ops: { type: 'array', items: { type: 'object' } } }, required: ['ops'] }
         : name === 'check_code' ? { type: 'object', properties: { js: { type: 'string' }, t: { type: 'number' } }, required: ['js'] }
         : name === 'add_element' ? { type: 'object', properties: { sceneId: { type: 'string' }, element: { type: 'object' } }, required: ['sceneId', 'element'] }
@@ -3955,15 +4040,17 @@ function toolSchema() {
 const MODEL_ROUTE_STORE = 'aiva_route';
 const ROUTE_CHEAP = 'deepseek-v4-flash';
 function cheapModel(picked) { return /pro|reasoner|opus|sonnet|gpt-5|large/.test(String(picked || '')) ? ROUTE_CHEAP : null; }
-async function streamChat(messages, tools, onState, signal, toolChoice) {
+async function streamChat(messages, tools, onState, signal, toolChoice, requestOptions) {
+  requestOptions = requestOptions || {};
   const picked = $('model').value;
   const model = (window.MODEL_OVERRIDE && $('modelRoute') && $('modelRoute').checked) ? window.MODEL_OVERRIDE : picked;
-  const body = { model, messages, stream: true, stream_options: { include_usage: true }, temperature: 0.6 };
+  const body = { model: requestOptions.model || model, messages, stream: true, stream_options: { include_usage: true }, temperature: requestOptions.temperature === undefined ? 0.6 : requestOptions.temperature, max_tokens: requestOptions.maxTokens || 6000 };
+  if (requestOptions.responseFormat) body.response_format = requestOptions.responseFormat;
   const forced = !!(toolChoice && toolChoice !== 'auto');
   if (tools && tools.length) { body.tools = tools; body.tool_choice = toolChoice || 'auto'; }
   /* keep the answer short: a step that only calls tools does not need an essay */
   if (!body.max_tokens) body.max_tokens = 2400;
-  const think = window.THINK_OVERRIDE || $('thinking').value;
+  const think = requestOptions.thinking || window.THINK_OVERRIDE || $('thinking').value;
   if (think === 'on') body.thinking = { type: 'enabled' };
   if (think === 'off') body.thinking = { type: 'disabled' };
   /* auto-heal: once a model has refused thinking once, stop asking it for the rest of the run */
@@ -4008,13 +4095,15 @@ async function streamChat(messages, tools, onState, signal, toolChoice) {
       throw new Error('API ' + res.status + ': ' + redact(txt.slice(0, 300)) + hint);
     }
   }
-  const acc = { content: '', reasoning: '', toolCalls: [], usage: null };
+  const acc = { content: '', reasoning: '', toolCalls: [], usage: null, finishReason: '', refusal: '' };
   if (!res.body) {                                  // no streaming -> plain JSON
     const j = JSON.parse(await res.text());
     const m = j.choices[0].message;
-    acc.content = m.content || '';
-    acc.reasoning = m.reasoning_content || '';
+    acc.content = typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map(p => p && (p.text || '')).join('\\n') : '';
+    acc.reasoning = m.reasoning_content || m.reasoning || '';
+    acc.refusal = m.refusal || '';
     acc.toolCalls = m.tool_calls || [];
+    acc.finishReason = j.choices[0].finish_reason || '';
     acc.usage = j.usage;
     onState(acc);
     return acc;
@@ -4038,9 +4127,11 @@ async function streamChat(messages, tools, onState, signal, toolChoice) {
       if (j.usage) { acc.usage = j.usage; onState(acc); }
       const ch = j.choices && j.choices[0];
       if (!ch) continue;
-      const d = ch.delta || {};
-      if (d.reasoning_content) acc.reasoning += d.reasoning_content;
-      if (d.content) acc.content += d.content;
+      const d = ch.delta || ch.message || {};
+      if (d.reasoning_content || d.reasoning) acc.reasoning += d.reasoning_content || d.reasoning;
+      if (d.content !== undefined) acc.content += typeof d.content === 'string' ? d.content : Array.isArray(d.content) ? d.content.map(p => p && (p.text || '')).join('\\n') : '';
+      if (d.refusal) acc.refusal += d.refusal;
+      if (ch.finish_reason) acc.finishReason = ch.finish_reason;
       if (d.tool_calls) {
         d.tool_calls.forEach((tc, k) => {
           const idx = (tc.index === undefined) ? k : tc.index;
@@ -4057,6 +4148,29 @@ async function streamChat(messages, tools, onState, signal, toolChoice) {
     }
   }
   acc.toolCalls = acc.toolCalls.filter(Boolean);
+  if (buf.trim() && buf.trim().startsWith('data:')) {
+    const tail = buf.trim().slice(5).trim();
+    if (tail && tail !== '[DONE]') {
+      try {
+        const event = JSON.parse(tail);
+        if (event.usage) acc.usage = event.usage;
+        const choice = event.choices && event.choices[0];
+        if (choice) {
+          const delta = choice.delta || choice.message || {};
+          if (delta.content) acc.content += delta.content;
+          if (delta.refusal) acc.refusal += delta.refusal;
+          if (delta.tool_calls) delta.tool_calls.forEach((tc, k) => {
+            const ix = tc.index === undefined ? k : tc.index;
+            const slot = acc.toolCalls[ix] || (acc.toolCalls[ix] = { id: '', type: 'function', function: { name: '', arguments: '' } });
+            if (tc.id) slot.id = tc.id;
+            if (tc.function && tc.function.name) slot.function.name = tc.function.name;
+            if (tc.function && tc.function.arguments) slot.function.arguments += tc.function.arguments;
+          });
+          if (choice.finish_reason) acc.finishReason = choice.finish_reason;
+        }
+      } catch (e) {}
+    }
+  }
   return acc;
 }
 
@@ -4065,6 +4179,170 @@ function tryJson(txt) {
   let t = String(txt).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   if (t[0] !== '{') return null;
   try { return JSON.parse(t); } catch (e) { return null; }
+}
+
+function validVideoBuildSpec(spec) {
+  return !!(
+    spec && typeof spec === 'object' &&
+    Array.isArray(spec.scenes) && spec.scenes.length > 0 && spec.scenes.length <= 40 &&
+    spec.scenes.every(scene =>
+      scene && typeof scene === 'object' &&
+      Number.isFinite(Number(scene.dur)) && Number(scene.dur) > 0 &&
+      Array.isArray(scene.elements) && scene.elements.length > 0 && scene.elements.length <= 40 &&
+      scene.elements.every(element => element && (element.type === 'text' || element.type === 'code'))
+    )
+  );
+}
+
+function buildSpecFromResponse(result) {
+  const parsed = result && tryJson(result.content);
+  if (!parsed) return null;
+  const spec = parsed.spec || (Array.isArray(parsed.scenes) ? parsed : null);
+  if (!validVideoBuildSpec(spec)) return null;
+  return { parsed, spec };
+}
+
+function isBuildRefusal(result) {
+  if (!result) return false;
+  if (result.refusal || result.finishReason === 'content_filter') return true;
+  return /\bI(?:'m| am) sorry,?\s*(?:but\s+)?I (?:cannot|can't) (?:assist with|help with|provide that|create that|generate that)\b|\bI (?:cannot|can't) (?:assist with|help with|provide that|create that|generate that)\b/i.test(String(result.content || ''));
+}
+
+/* Recover the build in the agent transport itself, not in the Settings UI. */
+async function buildVideoWithRecovery(messages, tools, onState, signal, originalUserText) {
+  const buildTool = (tools || []).find(tool => tool && tool.function && tool.function.name === 'replace_spec');
+  if (!buildTool) {
+    window.__LAST_TOOL_CALL_DIAGNOSTIC = 'Video tools are disabled. Turn on Agent tools in Settings → Agent.';
+    return { content: '', toolCalls: [], usage: null };
+  }
+
+  const systemMessage = (messages || []).find(message => message && message.role === 'system');
+  const history = (messages || []).filter(message =>
+    message && message !== systemMessage && (message.role === 'user' || message.role === 'assistant') &&
+    typeof message.content === 'string'
+  ).slice(-10);
+  const base = [];
+  if (systemMessage) base.push(systemMessage);
+  base.push(...history);
+  base.push({
+    role: 'system',
+    content:
+      'BUILD RECOVERY: the previous answer did not create the video. Call replace_spec now. ' +
+      'Do not answer with a plan or prose. Build a complete video with 3–6 scenes unless the user requests otherwise. ' +
+      'Every scene must have numeric dur, bg and an elements array. Each element type must be text or code. ' +
+      'Original request: ' + String(originalUserText || '').slice(0, 5000)
+  });
+
+  const previousThinking = window.THINK_OVERRIDE;
+  const previousModel = window.MODEL_OVERRIDE;
+  window.THINK_OVERRIDE = 'off';
+  window.MODEL_OVERRIDE = null;
+  window.__LAST_TOOL_CALL_DIAGNOSTIC = '';
+
+  try {
+    const attempts = [
+      { label: 'required tool mode', choice: 'required' },
+      { label: 'named function mode', choice: { type: 'function', function: { name: 'replace_spec' } } },
+      { label: 'automatic single-tool mode', choice: 'auto' }
+    ];
+    let lastResult = null;
+    let lastError = null;
+
+    for (const attempt of attempts) {
+      try {
+        const result = await streamChat(base, [buildTool], onState, signal, attempt.choice, {
+          thinking: 'off', maxTokens: 7000
+        });
+        lastResult = result;
+        if ((result.toolCalls || []).some(call => call.function && call.function.name === 'replace_spec')) {
+          window.STEP_NOTE = 'build recovered with ' + attempt.label;
+          return result;
+        }
+        if (isBuildRefusal(result)) {
+          window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider returned a safety refusal: ' + String(result.refusal || result.content || '').slice(0, 240);
+          return result;
+        }
+        const recovered = buildSpecFromResponse(result);
+        if (recovered) {
+          window.STEP_NOTE = 'build recovered from structured JSON';
+          return {
+            content: recovered.parsed.say || '',
+            reasoning: result.reasoning || '',
+            toolCalls: [{
+              id: 'call_json_recovered_replace_spec',
+              type: 'function',
+              function: { name: 'replace_spec', arguments: JSON.stringify({ spec: recovered.spec }) }
+            }],
+            usage: result.usage,
+            finishReason: result.finishReason
+          };
+        }
+      } catch (error) {
+        if (error && (error.name === 'AbortError' || /aborted/i.test(error.message || ''))) throw error;
+        lastError = error;
+        if (!error.retryableToolMode && !(error.status === 400 && /tool|function/i.test(error.message || ''))) break;
+      }
+    }
+
+    /* Compatibility path for models that can emit JSON but do not implement tools. */
+    const jsonMessages = base.concat([{
+      role: 'system',
+      content:
+        'Return only valid JSON, with no Markdown: {"spec":{"format":"9:16","scenes":[{"id":"s1","name":"Scene 1","dur":2.5,"bg":"#101820","elements":[{"type":"text","text":"...","x":540,"y":900,"size":100,"color":"#ffffff"}]}]}}. ' +
+        'Create the complete video requested above now.'
+    }]);
+    try {
+      let result;
+      try {
+        result = await streamChat(jsonMessages, null, onState, signal, null, {
+          thinking: 'off', maxTokens: 7000, responseFormat: { type: 'json_object' }
+        });
+      } catch (formatError) {
+        if (formatError && (formatError.name === 'AbortError' || /aborted/i.test(formatError.message || ''))) throw formatError;
+        result = await streamChat(jsonMessages, null, onState, signal, null, {
+          thinking: 'off', maxTokens: 7000
+        });
+      }
+      if (isBuildRefusal(result)) {
+        window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider returned a safety refusal: ' + String(result.refusal || result.content || '').slice(0, 240);
+        return result;
+      }
+      const recovered = buildSpecFromResponse(result);
+      if (recovered) {
+        window.STEP_NOTE = 'build recovered through JSON output mode';
+        return {
+          content: recovered.parsed.say || '',
+          reasoning: result.reasoning || '',
+          toolCalls: [{
+            id: 'call_json_mode_replace_spec',
+            type: 'function',
+            function: { name: 'replace_spec', arguments: JSON.stringify({ spec: recovered.spec }) }
+          }],
+          usage: result.usage,
+          finishReason: result.finishReason
+        };
+      }
+      lastResult = result || lastResult;
+    } catch (error) {
+      if (error && (error.name === 'AbortError' || /aborted/i.test(error.message || ''))) throw error;
+      lastError = error;
+    }
+
+    if (lastResult && isBuildRefusal(lastResult)) {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider refused this request: ' + String(lastResult.refusal || lastResult.content || '').slice(0, 240);
+    } else if (lastError) {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC = 'Video build request failed: ' + String(lastError.message || lastError).slice(0, 320);
+    } else {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC =
+        'The selected model did not return a replace_spec tool call or a valid video JSON spec. ' +
+        'Choose a model with tool-calling or JSON-output support.' +
+        (lastResult && lastResult.content ? ' Last response: ' + String(lastResult.content).slice(0, 180) : '');
+    }
+    return lastResult || { content: '', toolCalls: [], usage: null };
+  } finally {
+    window.THINK_OVERRIDE = previousThinking;
+    window.MODEL_OVERRIDE = previousModel;
+  }
 }
 
 /* ---------- task list (TodoWrite pattern) ---------- */
@@ -4191,9 +4469,16 @@ async function compactHistory(messages) {
 /* no step limit: the loop runs until the model stops calling tools (Stop button always works).
    SAFE_CAP only exists so a broken stream can never spin forever — it is far above any real run. */
 const SAFE_CAP = 999;
-/* a question about the footage is not a request to build */
+/* Distinguish an actual creation/edit brief from a question about existing footage.
+   Do not let a question mark inside a build brief disable the build path. */
 function wantsVideo(text) {
-  return !/[?]|\b(how many|how long|what|why|which|who|explain|tell me|read|count)\b/i.test(String(text || ''));
+  const value = String(text || '').trim();
+  if (!value) return false;
+  const action = /\b(create|make|generate|build|produce|design|render|edit|modify|change|add|remove|cut|trim|reframe|convert|turn into|animate|subtitle|caption|replace|shorten|extend)\b/i.test(value);
+  if (action) return true;
+  const startsAsQuestion = /^(?:what|why|how|who|which|explain|tell me|read|count|describe)\b/i.test(value);
+  const asksAboutFootage = /\b(video|clip|footage|reel|short|promo|trailer|explainer|intro)\b/i.test(value);
+  return !startsAsQuestion && asksAboutFootage && !/\?\s*$/.test(value);
 }
 
 /* run every tool call of one assistant turn, streaming its result into the chat */
@@ -4232,9 +4517,18 @@ async function execToolCalls(acc, cur, messages) {
 
 async function runAgent(userText) {
   const bubble = beginBotBubble();
-  const tools = $('useTools').checked ? toolSchema() : null;
+  const newVideoBuild = SPEC.scenes.length === 0 && wantsVideo(userText);
+  const allTools = $('useTools').checked ? toolSchema() : null;
+  const buildToolNames = new Set(['replace_spec', 'get_project', 'read_skill', 'list_skill_files', 'verify_video', 'set_style', 'todo_write', 'find_tools', 'set_music', 'beat_map', 'sfx', 'critique', 'audit', 'grab_frame']);
+  const tools = allTools ? (newVideoBuild ? allTools.filter(tool => buildToolNames.has(tool.function.name)) : allTools) : null;
   const messages = [{ role: 'system', content: systemPrompt() }]
     .concat(CHAT.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10).map(m => ({ role: m.role, content: m.content })));
+  if (newVideoBuild) {
+    messages.push({
+      role: 'system',
+      content: 'NEW VIDEO BUILD MODE: the canvas is empty. Your FIRST tool call MUST be replace_spec with a complete valid video spec. Do not call todo_write or read_skill before the first build. Build first, then verify_video, read relevant skills and refine. Do not answer with a plan.'
+    });
+  }
   messages.push({ role: 'user', content: userText });
 
   let cur = beginStep(bubble);
@@ -4254,7 +4548,32 @@ async function runAgent(userText) {
   let lastPromptTokens = 0;
   try {
     let lastSig = '', repeat = 0;
-    for (let step = 0; step < SAFE_CAP; step++) {
+    let buildHandledBeforeLoop = false;
+    let buildFailedBeforeLoop = false;
+
+    if (newVideoBuild && tools) {
+      buildHandledBeforeLoop = true;
+      cur = beginStep(bubble);
+      cur.body.textContent = 'Building video…';
+      $('stepInfo').textContent = 'creating first video pass';
+      const firstBuild = await buildVideoWithRecovery(messages, tools, render, ABORT.signal, userText);
+      addUsage(firstBuild && firstBuild.usage);
+      if (firstBuild && firstBuild.toolCalls && firstBuild.toolCalls.length) {
+        await execToolCalls(firstBuild, cur, messages);
+        built = SPEC.scenes.length > 0;
+        cur.body.textContent = built
+          ? 'Created ' + SPEC.scenes.length + ' scene' + (SPEC.scenes.length === 1 ? '' : 's') + ' · ' + DUR.toFixed(1) + 's.'
+          : 'The model returned a spec, but the editor did not create any scenes. Check the replace_spec tool result.';
+      } else {
+        cur.body.textContent = window.__LAST_TOOL_CALL_DIAGNOSTIC || 'The provider did not return a valid video spec.';
+      }
+      if (!built) {
+        finalText = cur.body.textContent;
+        buildFailedBeforeLoop = true;
+      }
+    }
+
+    for (let step = buildHandledBeforeLoop ? 1 : 0; !buildFailedBeforeLoop && step < SAFE_CAP; step++) {
       if (step) cur = beginStep(bubble);
       window.STEP_NOTE = '';
       $('stepInfo').textContent = 'step ' + (step + 1) + (tools ? '' : ' · tools off');
@@ -4262,7 +4581,7 @@ async function runAgent(userText) {
       const wire = reminder ? messages.concat([{ role: 'system', content: reminder }]) : messages;
       /* thinking is the expensive part of a step: let the model plan once, then
          run the mechanical tool steps without it */
-      window.THINK_OVERRIDE = $('thinking').value === 'auto' ? (step === 0 ? 'on' : 'off') : null;
+      window.THINK_OVERRIDE = newVideoBuild ? 'off' : ($('thinking').value === 'auto' ? (step === 0 ? 'on' : 'off') : null);
       /* step 0 plans on the picked model; routine tool steps are routed down */
       window.MODEL_OVERRIDE = step === 0 ? null : cheapModel($('model').value);
       const acc = await streamChat(wire, tools, render, ABORT.signal);
@@ -4293,39 +4612,26 @@ async function runAgent(userText) {
 
       finalText = acc.content || '';
       const asJson = tryJson(finalText);
-      if (asJson && (asJson.spec || asJson.ops || asJson.action)) {
+      if (asJson && (asJson.spec || Array.isArray(asJson.scenes) || asJson.ops || asJson.action)) {
         if (asJson.say) cur.body.textContent = asJson.say;
-        applyAgentResult(asJson);
-        finalText = asJson.say || '(updated the video)';
+        if (asJson.spec || Array.isArray(asJson.scenes)) {
+          const directSpec = asJson.spec || asJson;
+          if (typeof validVideoBuildSpec === 'function' && validVideoBuildSpec(directSpec)) {
+            applyAgentResult({ action: 'replace', spec: directSpec, say: asJson.say || '' });
+            finalText = asJson.say || '(video built from structured JSON)';
+          } else {
+            cur.body.textContent = 'The model returned JSON, but it is not a valid video spec. A spec must contain at least one scene with a duration and text/code elements.';
+            finalText = cur.body.textContent;
+            break;
+          }
+        } else {
+          applyAgentResult(asJson);
+          finalText = asJson.say || '(updated the video)';
+        }
         built = SPEC.scenes.length > 0;
         break;
       }
 
-      /* the model described a video instead of building one — force the build, then keep looping */
-      if (tools && !built && wantsVideo(userText)) {
-        cur = beginStep(bubble);
-        cur.body.textContent = 'Nothing is on the stage yet — forcing the build.';
-        messages.push({
-          role: 'user',
-          content: 'The stage is STILL EMPTY: no scenes exist. Stop explaining and call replace_spec right now with the complete spec for the video I asked for.'
-        });
-        $('stepInfo').textContent = 'forcing the build · step ' + (step + 1);
-        const forced = await streamChat(messages, tools, render, ABORT.signal,
-          { type: 'function', function: { name: 'replace_spec' } });
-        addUsage(forced.usage);
-        if (forced.toolCalls && forced.toolCalls.length) {
-          await execToolCalls(forced, cur, messages);
-          built = SPEC.scenes.length > 0;
-          cur.body.textContent = built
-            ? 'Built ' + SPEC.scenes.length + ' scene' + (SPEC.scenes.length === 1 ? '' : 's') + ' · ' + DUR.toFixed(1) + 's.'
-            : 'Still nothing was built — see the tool result above.';
-        } else {
-          cur.body.textContent = window.__LAST_TOOL_CALL_DIAGNOSTIC || 'The model did not return the replace_spec tool call. Check that the selected model supports tool calling.';
-        }
-        if (built) finalText = ''; else finalText = cur.body.textContent;
-        if (!built) break;
-        continue;
-      }
       break;
     }
 
@@ -4359,7 +4665,11 @@ async function sendPrompt() {
   if (BUSY) return;
   const text = $('prompt').value.trim();
   if (!text) { agentStatus('Type what you want first.'); return; }
-  if (!apiKey()) { agentStatus('Paste your DeepSeek API key (sk-…) above and press Save.'); return; }
+  if (!apiKey()) { agentStatus('Add an API key for the selected provider in Settings → Providers & models.'); return; }
+  if (SPEC.scenes.length === 0 && wantsVideo(text) && !$('useTools').checked) {
+    agentStatus('Turn on “Agent tools and action loop” in Settings → Agent to build videos.');
+    return;
+  }
   pushMsg('user', text);
   $('prompt').value = '';
   BUSY = true; $('btnSend').disabled = true; $('btnStop').disabled = false;

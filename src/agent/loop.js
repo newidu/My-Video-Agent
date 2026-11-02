@@ -1,11 +1,18 @@
-/* Agent execution loop and multi-step tool orchestration. Extracted from original/source.html lines 4190-4373. */
+/* Video agent execution loop and first-build orchestration. Section boundaries are validated against original/source.html by scripts/check.js. */
 /* ---------- the agent loop ---------- */
 /* no step limit: the loop runs until the model stops calling tools (Stop button always works).
    SAFE_CAP only exists so a broken stream can never spin forever — it is far above any real run. */
 const SAFE_CAP = 999;
-/* a question about the footage is not a request to build */
+/* Distinguish an actual creation/edit brief from a question about existing footage.
+   Do not let a question mark inside a build brief disable the build path. */
 function wantsVideo(text) {
-  return !/[?]|\b(how many|how long|what|why|which|who|explain|tell me|read|count)\b/i.test(String(text || ''));
+  const value = String(text || '').trim();
+  if (!value) return false;
+  const action = /\b(create|make|generate|build|produce|design|render|edit|modify|change|add|remove|cut|trim|reframe|convert|turn into|animate|subtitle|caption|replace|shorten|extend)\b/i.test(value);
+  if (action) return true;
+  const startsAsQuestion = /^(?:what|why|how|who|which|explain|tell me|read|count|describe)\b/i.test(value);
+  const asksAboutFootage = /\b(video|clip|footage|reel|short|promo|trailer|explainer|intro)\b/i.test(value);
+  return !startsAsQuestion && asksAboutFootage && !/\?\s*$/.test(value);
 }
 
 /* run every tool call of one assistant turn, streaming its result into the chat */
@@ -44,9 +51,18 @@ async function execToolCalls(acc, cur, messages) {
 
 async function runAgent(userText) {
   const bubble = beginBotBubble();
-  const tools = $('useTools').checked ? toolSchema() : null;
+  const newVideoBuild = SPEC.scenes.length === 0 && wantsVideo(userText);
+  const allTools = $('useTools').checked ? toolSchema() : null;
+  const buildToolNames = new Set(['replace_spec', 'get_project', 'read_skill', 'list_skill_files', 'verify_video', 'set_style', 'todo_write', 'find_tools', 'set_music', 'beat_map', 'sfx', 'critique', 'audit', 'grab_frame']);
+  const tools = allTools ? (newVideoBuild ? allTools.filter(tool => buildToolNames.has(tool.function.name)) : allTools) : null;
   const messages = [{ role: 'system', content: systemPrompt() }]
     .concat(CHAT.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10).map(m => ({ role: m.role, content: m.content })));
+  if (newVideoBuild) {
+    messages.push({
+      role: 'system',
+      content: 'NEW VIDEO BUILD MODE: the canvas is empty. Your FIRST tool call MUST be replace_spec with a complete valid video spec. Do not call todo_write or read_skill before the first build. Build first, then verify_video, read relevant skills and refine. Do not answer with a plan.'
+    });
+  }
   messages.push({ role: 'user', content: userText });
 
   let cur = beginStep(bubble);
@@ -66,7 +82,32 @@ async function runAgent(userText) {
   let lastPromptTokens = 0;
   try {
     let lastSig = '', repeat = 0;
-    for (let step = 0; step < SAFE_CAP; step++) {
+    let buildHandledBeforeLoop = false;
+    let buildFailedBeforeLoop = false;
+
+    if (newVideoBuild && tools) {
+      buildHandledBeforeLoop = true;
+      cur = beginStep(bubble);
+      cur.body.textContent = 'Building video…';
+      $('stepInfo').textContent = 'creating first video pass';
+      const firstBuild = await buildVideoWithRecovery(messages, tools, render, ABORT.signal, userText);
+      addUsage(firstBuild && firstBuild.usage);
+      if (firstBuild && firstBuild.toolCalls && firstBuild.toolCalls.length) {
+        await execToolCalls(firstBuild, cur, messages);
+        built = SPEC.scenes.length > 0;
+        cur.body.textContent = built
+          ? 'Created ' + SPEC.scenes.length + ' scene' + (SPEC.scenes.length === 1 ? '' : 's') + ' · ' + DUR.toFixed(1) + 's.'
+          : 'The model returned a spec, but the editor did not create any scenes. Check the replace_spec tool result.';
+      } else {
+        cur.body.textContent = window.__LAST_TOOL_CALL_DIAGNOSTIC || 'The provider did not return a valid video spec.';
+      }
+      if (!built) {
+        finalText = cur.body.textContent;
+        buildFailedBeforeLoop = true;
+      }
+    }
+
+    for (let step = buildHandledBeforeLoop ? 1 : 0; !buildFailedBeforeLoop && step < SAFE_CAP; step++) {
       if (step) cur = beginStep(bubble);
       window.STEP_NOTE = '';
       $('stepInfo').textContent = 'step ' + (step + 1) + (tools ? '' : ' · tools off');
@@ -74,7 +115,7 @@ async function runAgent(userText) {
       const wire = reminder ? messages.concat([{ role: 'system', content: reminder }]) : messages;
       /* thinking is the expensive part of a step: let the model plan once, then
          run the mechanical tool steps without it */
-      window.THINK_OVERRIDE = $('thinking').value === 'auto' ? (step === 0 ? 'on' : 'off') : null;
+      window.THINK_OVERRIDE = newVideoBuild ? 'off' : ($('thinking').value === 'auto' ? (step === 0 ? 'on' : 'off') : null);
       /* step 0 plans on the picked model; routine tool steps are routed down */
       window.MODEL_OVERRIDE = step === 0 ? null : cheapModel($('model').value);
       const acc = await streamChat(wire, tools, render, ABORT.signal);
@@ -105,39 +146,26 @@ async function runAgent(userText) {
 
       finalText = acc.content || '';
       const asJson = tryJson(finalText);
-      if (asJson && (asJson.spec || asJson.ops || asJson.action)) {
+      if (asJson && (asJson.spec || Array.isArray(asJson.scenes) || asJson.ops || asJson.action)) {
         if (asJson.say) cur.body.textContent = asJson.say;
-        applyAgentResult(asJson);
-        finalText = asJson.say || '(updated the video)';
+        if (asJson.spec || Array.isArray(asJson.scenes)) {
+          const directSpec = asJson.spec || asJson;
+          if (typeof validVideoBuildSpec === 'function' && validVideoBuildSpec(directSpec)) {
+            applyAgentResult({ action: 'replace', spec: directSpec, say: asJson.say || '' });
+            finalText = asJson.say || '(video built from structured JSON)';
+          } else {
+            cur.body.textContent = 'The model returned JSON, but it is not a valid video spec. A spec must contain at least one scene with a duration and text/code elements.';
+            finalText = cur.body.textContent;
+            break;
+          }
+        } else {
+          applyAgentResult(asJson);
+          finalText = asJson.say || '(updated the video)';
+        }
         built = SPEC.scenes.length > 0;
         break;
       }
 
-      /* the model described a video instead of building one — force the build, then keep looping */
-      if (tools && !built && wantsVideo(userText)) {
-        cur = beginStep(bubble);
-        cur.body.textContent = 'Nothing is on the stage yet — forcing the build.';
-        messages.push({
-          role: 'user',
-          content: 'The stage is STILL EMPTY: no scenes exist. Stop explaining and call replace_spec right now with the complete spec for the video I asked for.'
-        });
-        $('stepInfo').textContent = 'forcing the build · step ' + (step + 1);
-        const forced = await streamChat(messages, tools, render, ABORT.signal,
-          { type: 'function', function: { name: 'replace_spec' } });
-        addUsage(forced.usage);
-        if (forced.toolCalls && forced.toolCalls.length) {
-          await execToolCalls(forced, cur, messages);
-          built = SPEC.scenes.length > 0;
-          cur.body.textContent = built
-            ? 'Built ' + SPEC.scenes.length + ' scene' + (SPEC.scenes.length === 1 ? '' : 's') + ' · ' + DUR.toFixed(1) + 's.'
-            : 'Still nothing was built — see the tool result above.';
-        } else {
-          cur.body.textContent = window.__LAST_TOOL_CALL_DIAGNOSTIC || 'The model did not return the replace_spec tool call. Check that the selected model supports tool calling.';
-        }
-        if (built) finalText = ''; else finalText = cur.body.textContent;
-        if (!built) break;
-        continue;
-      }
       break;
     }
 
@@ -171,7 +199,11 @@ async function sendPrompt() {
   if (BUSY) return;
   const text = $('prompt').value.trim();
   if (!text) { agentStatus('Type what you want first.'); return; }
-  if (!apiKey()) { agentStatus('Paste your DeepSeek API key (sk-…) above and press Save.'); return; }
+  if (!apiKey()) { agentStatus('Add an API key for the selected provider in Settings → Providers & models.'); return; }
+  if (SPEC.scenes.length === 0 && wantsVideo(text) && !$('useTools').checked) {
+    agentStatus('Turn on “Agent tools and action loop” in Settings → Agent to build videos.');
+    return;
+  }
   pushMsg('user', text);
   $('prompt').value = '';
   BUSY = true; $('btnSend').disabled = true; $('btnStop').disabled = false;

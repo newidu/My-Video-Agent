@@ -1,19 +1,21 @@
-/* Model streaming, task list and context compaction. Extracted from original/source.html lines 3952-4189. */
+/* Model transport, build recovery, context and task-list handling. Section boundaries are validated against original/source.html by scripts/check.js. */
 /* ---------- streaming model call ---------- */
 /* model routing (Claude-Code pattern): the expensive model thinks and plans,
    the cheap one grinds through the mechanical tool steps */
 const MODEL_ROUTE_STORE = 'aiva_route';
 const ROUTE_CHEAP = 'deepseek-v4-flash';
 function cheapModel(picked) { return /pro|reasoner|opus|sonnet|gpt-5|large/.test(String(picked || '')) ? ROUTE_CHEAP : null; }
-async function streamChat(messages, tools, onState, signal, toolChoice) {
+async function streamChat(messages, tools, onState, signal, toolChoice, requestOptions) {
+  requestOptions = requestOptions || {};
   const picked = $('model').value;
   const model = (window.MODEL_OVERRIDE && $('modelRoute') && $('modelRoute').checked) ? window.MODEL_OVERRIDE : picked;
-  const body = { model, messages, stream: true, stream_options: { include_usage: true }, temperature: 0.6 };
+  const body = { model: requestOptions.model || model, messages, stream: true, stream_options: { include_usage: true }, temperature: requestOptions.temperature === undefined ? 0.6 : requestOptions.temperature, max_tokens: requestOptions.maxTokens || 6000 };
+  if (requestOptions.responseFormat) body.response_format = requestOptions.responseFormat;
   const forced = !!(toolChoice && toolChoice !== 'auto');
   if (tools && tools.length) { body.tools = tools; body.tool_choice = toolChoice || 'auto'; }
   /* keep the answer short: a step that only calls tools does not need an essay */
   if (!body.max_tokens) body.max_tokens = 2400;
-  const think = window.THINK_OVERRIDE || $('thinking').value;
+  const think = requestOptions.thinking || window.THINK_OVERRIDE || $('thinking').value;
   if (think === 'on') body.thinking = { type: 'enabled' };
   if (think === 'off') body.thinking = { type: 'disabled' };
   /* auto-heal: once a model has refused thinking once, stop asking it for the rest of the run */
@@ -58,13 +60,15 @@ async function streamChat(messages, tools, onState, signal, toolChoice) {
       throw new Error('API ' + res.status + ': ' + redact(txt.slice(0, 300)) + hint);
     }
   }
-  const acc = { content: '', reasoning: '', toolCalls: [], usage: null };
+  const acc = { content: '', reasoning: '', toolCalls: [], usage: null, finishReason: '', refusal: '' };
   if (!res.body) {                                  // no streaming -> plain JSON
     const j = JSON.parse(await res.text());
     const m = j.choices[0].message;
-    acc.content = m.content || '';
-    acc.reasoning = m.reasoning_content || '';
+    acc.content = typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map(p => p && (p.text || '')).join('\\n') : '';
+    acc.reasoning = m.reasoning_content || m.reasoning || '';
+    acc.refusal = m.refusal || '';
     acc.toolCalls = m.tool_calls || [];
+    acc.finishReason = j.choices[0].finish_reason || '';
     acc.usage = j.usage;
     onState(acc);
     return acc;
@@ -88,9 +92,11 @@ async function streamChat(messages, tools, onState, signal, toolChoice) {
       if (j.usage) { acc.usage = j.usage; onState(acc); }
       const ch = j.choices && j.choices[0];
       if (!ch) continue;
-      const d = ch.delta || {};
-      if (d.reasoning_content) acc.reasoning += d.reasoning_content;
-      if (d.content) acc.content += d.content;
+      const d = ch.delta || ch.message || {};
+      if (d.reasoning_content || d.reasoning) acc.reasoning += d.reasoning_content || d.reasoning;
+      if (d.content !== undefined) acc.content += typeof d.content === 'string' ? d.content : Array.isArray(d.content) ? d.content.map(p => p && (p.text || '')).join('\\n') : '';
+      if (d.refusal) acc.refusal += d.refusal;
+      if (ch.finish_reason) acc.finishReason = ch.finish_reason;
       if (d.tool_calls) {
         d.tool_calls.forEach((tc, k) => {
           const idx = (tc.index === undefined) ? k : tc.index;
@@ -107,6 +113,29 @@ async function streamChat(messages, tools, onState, signal, toolChoice) {
     }
   }
   acc.toolCalls = acc.toolCalls.filter(Boolean);
+  if (buf.trim() && buf.trim().startsWith('data:')) {
+    const tail = buf.trim().slice(5).trim();
+    if (tail && tail !== '[DONE]') {
+      try {
+        const event = JSON.parse(tail);
+        if (event.usage) acc.usage = event.usage;
+        const choice = event.choices && event.choices[0];
+        if (choice) {
+          const delta = choice.delta || choice.message || {};
+          if (delta.content) acc.content += delta.content;
+          if (delta.refusal) acc.refusal += delta.refusal;
+          if (delta.tool_calls) delta.tool_calls.forEach((tc, k) => {
+            const ix = tc.index === undefined ? k : tc.index;
+            const slot = acc.toolCalls[ix] || (acc.toolCalls[ix] = { id: '', type: 'function', function: { name: '', arguments: '' } });
+            if (tc.id) slot.id = tc.id;
+            if (tc.function && tc.function.name) slot.function.name = tc.function.name;
+            if (tc.function && tc.function.arguments) slot.function.arguments += tc.function.arguments;
+          });
+          if (choice.finish_reason) acc.finishReason = choice.finish_reason;
+        }
+      } catch (e) {}
+    }
+  }
   return acc;
 }
 
@@ -115,6 +144,170 @@ function tryJson(txt) {
   let t = String(txt).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   if (t[0] !== '{') return null;
   try { return JSON.parse(t); } catch (e) { return null; }
+}
+
+function validVideoBuildSpec(spec) {
+  return !!(
+    spec && typeof spec === 'object' &&
+    Array.isArray(spec.scenes) && spec.scenes.length > 0 && spec.scenes.length <= 40 &&
+    spec.scenes.every(scene =>
+      scene && typeof scene === 'object' &&
+      Number.isFinite(Number(scene.dur)) && Number(scene.dur) > 0 &&
+      Array.isArray(scene.elements) && scene.elements.length > 0 && scene.elements.length <= 40 &&
+      scene.elements.every(element => element && (element.type === 'text' || element.type === 'code'))
+    )
+  );
+}
+
+function buildSpecFromResponse(result) {
+  const parsed = result && tryJson(result.content);
+  if (!parsed) return null;
+  const spec = parsed.spec || (Array.isArray(parsed.scenes) ? parsed : null);
+  if (!validVideoBuildSpec(spec)) return null;
+  return { parsed, spec };
+}
+
+function isBuildRefusal(result) {
+  if (!result) return false;
+  if (result.refusal || result.finishReason === 'content_filter') return true;
+  return /\bI(?:'m| am) sorry,?\s*(?:but\s+)?I (?:cannot|can't) (?:assist with|help with|provide that|create that|generate that)\b|\bI (?:cannot|can't) (?:assist with|help with|provide that|create that|generate that)\b/i.test(String(result.content || ''));
+}
+
+/* Recover the build in the agent transport itself, not in the Settings UI. */
+async function buildVideoWithRecovery(messages, tools, onState, signal, originalUserText) {
+  const buildTool = (tools || []).find(tool => tool && tool.function && tool.function.name === 'replace_spec');
+  if (!buildTool) {
+    window.__LAST_TOOL_CALL_DIAGNOSTIC = 'Video tools are disabled. Turn on Agent tools in Settings → Agent.';
+    return { content: '', toolCalls: [], usage: null };
+  }
+
+  const systemMessage = (messages || []).find(message => message && message.role === 'system');
+  const history = (messages || []).filter(message =>
+    message && message !== systemMessage && (message.role === 'user' || message.role === 'assistant') &&
+    typeof message.content === 'string'
+  ).slice(-10);
+  const base = [];
+  if (systemMessage) base.push(systemMessage);
+  base.push(...history);
+  base.push({
+    role: 'system',
+    content:
+      'BUILD RECOVERY: the previous answer did not create the video. Call replace_spec now. ' +
+      'Do not answer with a plan or prose. Build a complete video with 3–6 scenes unless the user requests otherwise. ' +
+      'Every scene must have numeric dur, bg and an elements array. Each element type must be text or code. ' +
+      'Original request: ' + String(originalUserText || '').slice(0, 5000)
+  });
+
+  const previousThinking = window.THINK_OVERRIDE;
+  const previousModel = window.MODEL_OVERRIDE;
+  window.THINK_OVERRIDE = 'off';
+  window.MODEL_OVERRIDE = null;
+  window.__LAST_TOOL_CALL_DIAGNOSTIC = '';
+
+  try {
+    const attempts = [
+      { label: 'required tool mode', choice: 'required' },
+      { label: 'named function mode', choice: { type: 'function', function: { name: 'replace_spec' } } },
+      { label: 'automatic single-tool mode', choice: 'auto' }
+    ];
+    let lastResult = null;
+    let lastError = null;
+
+    for (const attempt of attempts) {
+      try {
+        const result = await streamChat(base, [buildTool], onState, signal, attempt.choice, {
+          thinking: 'off', maxTokens: 7000
+        });
+        lastResult = result;
+        if ((result.toolCalls || []).some(call => call.function && call.function.name === 'replace_spec')) {
+          window.STEP_NOTE = 'build recovered with ' + attempt.label;
+          return result;
+        }
+        if (isBuildRefusal(result)) {
+          window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider returned a safety refusal: ' + String(result.refusal || result.content || '').slice(0, 240);
+          return result;
+        }
+        const recovered = buildSpecFromResponse(result);
+        if (recovered) {
+          window.STEP_NOTE = 'build recovered from structured JSON';
+          return {
+            content: recovered.parsed.say || '',
+            reasoning: result.reasoning || '',
+            toolCalls: [{
+              id: 'call_json_recovered_replace_spec',
+              type: 'function',
+              function: { name: 'replace_spec', arguments: JSON.stringify({ spec: recovered.spec }) }
+            }],
+            usage: result.usage,
+            finishReason: result.finishReason
+          };
+        }
+      } catch (error) {
+        if (error && (error.name === 'AbortError' || /aborted/i.test(error.message || ''))) throw error;
+        lastError = error;
+        if (!error.retryableToolMode && !(error.status === 400 && /tool|function/i.test(error.message || ''))) break;
+      }
+    }
+
+    /* Compatibility path for models that can emit JSON but do not implement tools. */
+    const jsonMessages = base.concat([{
+      role: 'system',
+      content:
+        'Return only valid JSON, with no Markdown: {"spec":{"format":"9:16","scenes":[{"id":"s1","name":"Scene 1","dur":2.5,"bg":"#101820","elements":[{"type":"text","text":"...","x":540,"y":900,"size":100,"color":"#ffffff"}]}]}}. ' +
+        'Create the complete video requested above now.'
+    }]);
+    try {
+      let result;
+      try {
+        result = await streamChat(jsonMessages, null, onState, signal, null, {
+          thinking: 'off', maxTokens: 7000, responseFormat: { type: 'json_object' }
+        });
+      } catch (formatError) {
+        if (formatError && (formatError.name === 'AbortError' || /aborted/i.test(formatError.message || ''))) throw formatError;
+        result = await streamChat(jsonMessages, null, onState, signal, null, {
+          thinking: 'off', maxTokens: 7000
+        });
+      }
+      if (isBuildRefusal(result)) {
+        window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider returned a safety refusal: ' + String(result.refusal || result.content || '').slice(0, 240);
+        return result;
+      }
+      const recovered = buildSpecFromResponse(result);
+      if (recovered) {
+        window.STEP_NOTE = 'build recovered through JSON output mode';
+        return {
+          content: recovered.parsed.say || '',
+          reasoning: result.reasoning || '',
+          toolCalls: [{
+            id: 'call_json_mode_replace_spec',
+            type: 'function',
+            function: { name: 'replace_spec', arguments: JSON.stringify({ spec: recovered.spec }) }
+          }],
+          usage: result.usage,
+          finishReason: result.finishReason
+        };
+      }
+      lastResult = result || lastResult;
+    } catch (error) {
+      if (error && (error.name === 'AbortError' || /aborted/i.test(error.message || ''))) throw error;
+      lastError = error;
+    }
+
+    if (lastResult && isBuildRefusal(lastResult)) {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC = 'The provider refused this request: ' + String(lastResult.refusal || lastResult.content || '').slice(0, 240);
+    } else if (lastError) {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC = 'Video build request failed: ' + String(lastError.message || lastError).slice(0, 320);
+    } else {
+      window.__LAST_TOOL_CALL_DIAGNOSTIC =
+        'The selected model did not return a replace_spec tool call or a valid video JSON spec. ' +
+        'Choose a model with tool-calling or JSON-output support.' +
+        (lastResult && lastResult.content ? ' Last response: ' + String(lastResult.content).slice(0, 180) : '');
+    }
+    return lastResult || { content: '', toolCalls: [], usage: null };
+  } finally {
+    window.THINK_OVERRIDE = previousThinking;
+    window.MODEL_OVERRIDE = previousModel;
+  }
 }
 
 /* ---------- task list (TodoWrite pattern) ---------- */
