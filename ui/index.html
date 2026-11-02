@@ -381,6 +381,18 @@
           <p id="agentStatus" class="muted small"></p>
         </div>
       </div>
+      <section id="debugPanel" class="debug-panel" hidden aria-label="Agent debug report">
+        <div class="debug-panel-head">
+          <strong>Agent debug report</strong>
+          <div class="debug-panel-actions">
+            <button id="btnRefreshDebug" type="button">Refresh</button>
+            <button id="btnCopyDebugText" type="button" class="primary">Copy report</button>
+            <button id="btnCloseDebug" type="button" aria-label="Close debug report">Close</button>
+          </div>
+        </div>
+        <textarea id="debugOutput" rows="8" readonly spellcheck="false" aria-label="Copyable debug report"></textarea>
+        <p id="debugCopyStatus" role="status">The report excludes prompt text, API keys and project media. You can select the text here manually if clipboard access is blocked.</p>
+      </section>
     </aside>
 
     <section class="editorWorkspace" aria-label="Video editing workspace">
@@ -446,5 +458,6 @@
 <script src="../src/agent/loop.js"></script>
 <script src="../src/agent/spec-bridge-and-boot.js"></script>
 <script src="./redesign/settings.js"></script>
+<script src="../src/agent/debug.js"></script>
 </body>
 </html>
