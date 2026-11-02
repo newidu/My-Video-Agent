@@ -3,9 +3,16 @@
 /* no step limit: the loop runs until the model stops calling tools (Stop button always works).
    SAFE_CAP only exists so a broken stream can never spin forever — it is far above any real run. */
 const SAFE_CAP = 999;
-/* a question about the footage is not a request to build */
+/* Distinguish an actual creation/edit brief from a question about existing footage.
+   Do not let a question mark inside a build brief disable the build path. */
 function wantsVideo(text) {
-  return !/[?]|\b(how many|how long|what|why|which|who|explain|tell me|read|count)\b/i.test(String(text || ''));
+  const value = String(text || '').trim();
+  if (!value) return false;
+  const action = /\b(create|make|generate|build|produce|design|render|edit|modify|change|add|remove|cut|trim|reframe|convert|turn into|animate|subtitle|caption|replace|shorten|extend)\b/i.test(value);
+  if (action) return true;
+  const startsAsQuestion = /^(?:what|why|how|who|which|explain|tell me|read|count|describe)\b/i.test(value);
+  const asksAboutFootage = /\b(video|clip|footage|reel|short|promo|trailer|explainer|intro)\b/i.test(value);
+  return !startsAsQuestion && asksAboutFootage && !/\?\s*$/.test(value);
 }
 
 /* run every tool call of one assistant turn, streaming its result into the chat */
