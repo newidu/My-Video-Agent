@@ -25,10 +25,12 @@ for (const relative of [...engineScriptPaths, settingsScript]) {
 }
 const settingsCss = path.join(root, 'ui', 'redesign', 'settings.css');
 if (!fs.existsSync(settingsCss)) throw new Error('Missing dedicated settings stylesheet.');
+const cssText = fs.readFileSync(settingsCss,'utf8');
+if ((cssText.match(/\{/g) || []).length !== (cssText.match(/\}/g) || []).length) throw new Error('Unbalanced braces in settings.css.');
 const settingsHtmlIds = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map(m => m[1]);
 const duplicateIds = [...new Set(settingsHtmlIds.filter((id, i) => settingsHtmlIds.indexOf(id) !== i))];
 if (duplicateIds.length) throw new Error('Duplicate UI element IDs: ' + duplicateIds.join(', '));
-for (const id of ['settingsView','providerPreset','apiKey','baseUrl','model','skillBox','toolSettingsList','musicBox','settingDefaultFormat']) {
+for (const id of ['settingsView','providerPreset','apiKey','baseUrl','model','skillBox','toolSettingsList','musicBox','settingDefaultFormat','settingExportBitrate','manualModel']) {
  if (!settingsHtmlIds.includes(id)) throw new Error('Settings UI is missing required element: ' + id);
 }
 const source = fs.readFileSync(path.join(root, 'original', 'source.html'), 'utf8');
