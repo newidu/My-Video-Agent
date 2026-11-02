@@ -85,6 +85,8 @@
         $('model').insertBefore(opt, $('model').firstChild);
       }
       $('model').value = model;
+    } else {
+      $('model').value = '';
     }
     const key = getStorage(profileKey(activeProvider,'key')) || (activeProvider === 'deepseek' ? getStorage('aiva_key') : '');
     $('apiKey').value = memKeys[activeProvider] || key || '';
@@ -255,7 +257,9 @@
     if (event.key === 'Enter') { event.preventDefault(); $('btnSetManualModel').click(); }
   });
   $('apiKey').addEventListener('change',() => { memKeys[activeProvider] = $('apiKey').value.trim(); });
-  $('rememberKey').checked = getStorage('aiva_remember') !== '0';
+  const savedRemember = getStorage('aiva_remember');
+  const legacyRemember = getStorage('aiva_key_remember');
+  $('rememberKey').checked = savedRemember === '' ? legacyRemember !== '0' : savedRemember !== '0';
   $('rememberKey').addEventListener('change',() => {
     setStorage('aiva_remember',$('rememberKey').checked ? '1' : '0');
     if (!$('rememberKey').checked) {
