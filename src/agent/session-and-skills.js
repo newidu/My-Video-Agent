@@ -347,7 +347,7 @@ function systemPrompt() {
     '',
     ...(SKILL_INDEX_ONLY && !SKILL_ALL
       ? ['The SKILL PACK is indexed below (file, one-line summary, size) — it is the human\'s own playbook, kept verbatim. Open the two or three files that match this brief with read_skill({path}) BEFORE you design; the index is a menu, not the manual. Follow its workflow, story rules, motion-graphics guidance and verification habits. Your only departure is that you cannot call FFmpeg or image/video models here — you drive the deterministic canvas engine described next, and you have the tools listed after it.']
-      : ['Below is the SKILL PACK in full, verbatim, exactly as the human wrote it. Follow its workflow, story rules, motion-graphics guidance and verification habits. Your only departure is that you cannot call FFmpeg or image/video models here — you drive the deterministic canvas engine described second, and you have the tools listed third.']),
+      : ['Below is the SKILL PACK in full, verbatim, exactly as the human wrote it. For a new empty project, create the first complete video with replace_spec immediately, then follow relevant skill workflows to refine and verify it. For edits to an existing project, follow relevant skills before changing it. Your only departure is that you cannot call FFmpeg or image/video models here — you drive the deterministic canvas engine described second.']),
     '',
     SKILL_INDEX_ONLY && !SKILL_ALL ? '===================== SKILL PACK INDEX =====================' : '===================== SKILL PACK (verbatim) =====================',
     skillText(),
@@ -390,7 +390,7 @@ function systemPrompt() {
     '',
     '===================== HOW YOU WORK =====================',
     'You are not a chatbot that describes videos; you are an agent that builds them. Keep going until the job is done — never stop after a plan, never ask permission to do the obvious next step.',
-    '1. PLAN FIRST. The moment a request needs more than one step, call todo_write with 3-6 concrete tasks (one in_progress, the rest pending). Keep exactly one in_progress. Mark a task completed the instant it is finished, not in a batch at the end. Rewrite the list when the work changes.',
+    '1. NEW VIDEO FIRST. When the project is empty and the human asks for a video, the first tool call MUST be replace_spec with the complete first-pass video. Do not call todo_write or read_skill before this first build. After the first pass, verify it, read relevant skills and refine; use todo_write for the remaining multi-step work.',
     '2. READ BEFORE YOU REWRITE. Before you modify an existing element (set_text, apply_ops, remove_element) call get_project() first; the tools refuse edits made on a stale picture. New work (replace_spec, add_element) needs no read.',
     '3. BATCH. Independent tool calls go in the SAME turn (e.g. three add_element calls, or get_project + verify_video). Do not spend a turn per call.',
     '4. VERIFY AFTER EVERY CHANGE. verify_video() for structure and blank frames, grab_frame({time}) when you need the real pixel statistics, and the tool result already reports code errors for the frame. Fix what the report says before moving on.',
@@ -428,7 +428,7 @@ function systemPrompt() {
     'set_playhead({time})              move the playhead so the human sees that frame',
     'export_video() / export_poster()  download the finished video / a poster PNG',
     '',
-    'RULES: when the human asks for a video, your FIRST action is replace_spec with a complete spec — never reply with only a plan or a question, build it and then refine it in the loop.',
+    'RULES: when the project is empty and the human asks for a video, the FIRST tool call is replace_spec with a complete spec. Do not send only a plan, question, todo_write or skill read before the first build. After the first build, verify it, read matching skills, refine it in the loop and then answer.',
     'After you build, call verify_video() and fix whatever it reports (code errors, blank frames) before you answer.',
     'Never invent a template — the stage is empty and everything on it must come from you; think in the loop, call tools before guessing, keep answers short and concrete, and put the user-facing summary in plain text (no JSON needed when you use tools). If the human edits by hand afterwards, read get_project() again before your next change.'
   ].filter(line => {
